@@ -54,6 +54,10 @@ const successModalElement = document.getElementById('successModal');
 const successModal = new bootstrap.Modal(successModalElement);
 const successMessage = document.getElementById('success-message');
 
+// Gráfico (NUEVO)
+const categoryChartCanvas = document.getElementById('categoryChart');
+let categoryChart = null; // Variable global para almacenar la instancia del gráfico
+
 // Variables de Estado
 let isSignInMode = true;
 
@@ -194,7 +198,7 @@ checkUser();
 // ==============================================
 
 /**
- * FASE 3/UX: Obtiene, calcula el total, filtra y renderiza la lista de gastos.
+ * FASE 3/UX: Obtiene, calcula el total, filtra y renderiza la lista de gastos del usuario.
  */
 async function obtenerGastos(categoriaFilter = 'ALL') {
     gastosList.innerHTML = '<tr><td colspan="5" class="text-center">Cargando gastos...</td></tr>';
@@ -206,7 +210,7 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
         .select('monto, descripcion, categoria, fecha, id')
         .order('fecha', { ascending: false });
 
-    // --- LÓGICA DE FILTRADO ---
+    // LÓGICA DE FILTRADO
     if (categoriaFilter !== 'ALL') {
         query = query.eq('categoria', categoriaFilter);
     }
@@ -219,10 +223,14 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
         return;
     }
 
-    // --- CÁLCULO DEL TOTAL ---
+    // CÁLCULO DEL TOTAL
     const totalMonto = gastos.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
     totalGastosElement.textContent = `$${totalMonto.toFixed(2)}`;
     
+    // --- LÓGICA DEL GRÁFICO (NUEVO) ---
+    renderChart(gastos);
+    // -----------------------------------
+
     renderGastos(gastos);
 }
 
@@ -415,4 +423,67 @@ function setupRealtime() {
             obtenerGastos(filterCategoria.value); 
         })
         .subscribe();
+};
+
+/**
+ * UX: Procesa los gastos y renderiza el gráfico de pastel por categoría.
+ * @param {Array} gastos - La lista de gastos del usuario.
+ */
+function renderChart(gastos) {
+    // 1. Agrupar montos por categoría
+    const categoryTotals = gastos.reduce((acc, gasto) => {
+        const monto = parseFloat(gasto.monto);
+        if (acc[gasto.categoria]) {
+            acc[gasto.categoria] += monto;
+        } else {
+            acc[gasto.categoria] = monto;
+        }
+        return acc;
+    }, {});
+
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
+
+    // Colores predefinidos para las categorías
+    const colors = {
+        'Alimentación': '#FF6384',
+        'Transporte': '#36A2EB',
+        'Vivienda': '#FFCE56',
+        'Entretenimiento': '#4BC0C0',
+        'Otros': '#9966FF',
+    };
+    
+    const backgroundColors = labels.map(label => colors[label] || '#CCCCCC');
+
+    // 2. Destruir el gráfico anterior si existe
+    if (categoryChart) {
+        categoryChart.destroy();
+    }
+
+    // 3. Crear el nuevo gráfico de pastel
+    categoryChart = new Chart(categoryChartCanvas, {
+        type: 'doughnut', // Gráfico de rosquilla o pastel
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                title: {
+                    display: true,
+                    text: 'Distribución Porcentual del Gasto',
+                    font: { size: 14 }
+                }
+            }
+        }
+    });
 }
