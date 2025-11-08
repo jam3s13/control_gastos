@@ -64,6 +64,10 @@ const trendButtons = document.querySelectorAll('.btn-group button[data-granulari
 let trendChart = null; // Variable global para almacenar la instancia del gráfico de tendencia
 let trendGranularity = 'day'; // Estado inicial: agrupar por día
 
+// Estado de Ordenamiento (NUEVO)
+let currentSortColumn = 'fecha'; // Columna por defecto
+let currentSortOrder = 'desc'; // Orden por defecto (descendente)
+
 // Variables de Estado
 let isSignInMode = true;
 
@@ -204,7 +208,7 @@ checkUser();
 // ==============================================
 
 /**
- * FASE 3/UX: Obtiene, calcula el total, filtra y renderiza la lista de gastos del usuario.
+ * FASE 3/UX: Obtiene, calcula el total, filtra, ordena y renderiza la lista de gastos.
  */
 async function obtenerGastos(categoriaFilter = 'ALL') {
     gastosList.innerHTML = '<tr><td colspan="5" class="text-center">Cargando gastos...</td></tr>';
@@ -213,13 +217,18 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
     
     let query = supabase
         .from('gastos')
-        .select('monto, descripcion, categoria, fecha, id')
-        .order('fecha', { ascending: false });
+        .select('monto, descripcion, categoria, fecha, id');
+        // El ordenamiento se mueve después del filtrado
 
     // LÓGICA DE FILTRADO
     if (categoriaFilter !== 'ALL') {
         query = query.eq('categoria', categoriaFilter);
     }
+    
+    // --- LÓGICA DE ORDENAMIENTO (NUEVO) ---
+    const isAscending = currentSortOrder === 'asc';
+    query = query.order(currentSortColumn, { ascending: isAscending });
+    // ----------------------------------------
 
     const { data: gastos, error } = await query;
 
@@ -229,18 +238,14 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
         return;
     }
 
-    // CÁLCULO DEL TOTAL    
     const totalMonto = gastos.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
     totalGastosElement.textContent = `$${totalMonto.toFixed(2)}`;
     
-    // LÓGICA DEL GRÁFICO DE DISTRIBUCIÓN
     renderChart(gastos);
-    
-    // --- LÓGICA DEL GRÁFICO DE TENDENCIA (NUEVO) ---
     renderTrendChart(gastos, trendGranularity);
-    // ------------------------------------------------
 
     renderGastos(gastos);
+    updateSortIndicators(); // Llama a la nueva función
 }
 
 function renderGastos(gastos) {
@@ -434,6 +439,28 @@ trendButtons.forEach(button => {
     });
 });
 
+/**
+ * UX: Listener para hacer clic en los encabezados de la tabla.
+ */
+document.querySelector('#app-container table thead').addEventListener('click', (e) => {
+    const header = e.target.closest('.sortable');
+    if (!header) return;
+
+    const newSortColumn = header.dataset.sort;
+
+    if (newSortColumn === currentSortColumn) {
+        // Si es la misma columna, simplemente invertimos el orden
+        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Si es una columna nueva, cambiamos la columna y reiniciamos a descendente
+        currentSortColumn = newSortColumn;
+        currentSortOrder = 'desc'; 
+    }
+
+    // Recargar la lista de gastos con los nuevos parámetros de ordenamiento
+    obtenerGastos(filterCategoria.value);
+});
+
 // Inicializar el botón de 'Día' como activo (ya que el estado inicial es 'day')
 document.getElementById('trend-day').classList.add('btn-info');
 
@@ -590,4 +617,20 @@ function renderTrendChart(gastos, granularity) {
             }
         }
     });
+};
+
+/**
+ * UX: Actualiza las flechas indicadoras de orden en los encabezados.
+ */
+function updateSortIndicators() {
+    // 1. Limpiar todos los indicadores
+    document.querySelectorAll('.sortable span').forEach(span => {
+        span.textContent = '';
+    });
+
+    // 2. Establecer el indicador actual
+    const indicator = document.getElementById(`sort-${currentSortColumn}`);
+    if (indicator) {
+        indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
+    }
 }
