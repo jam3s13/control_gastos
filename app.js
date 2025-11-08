@@ -58,6 +58,12 @@ const successMessage = document.getElementById('success-message');
 const categoryChartCanvas = document.getElementById('categoryChart');
 let categoryChart = null; // Variable global para almacenar la instancia del gráfico
 
+// Gráfico de Tendencia (NUEVO)
+const trendChartCanvas = document.getElementById('trendChart');
+const trendButtons = document.querySelectorAll('.btn-group button[data-granularity]');
+let trendChart = null; // Variable global para almacenar la instancia del gráfico de tendencia
+let trendGranularity = 'day'; // Estado inicial: agrupar por día
+
 // Variables de Estado
 let isSignInMode = true;
 
@@ -223,13 +229,16 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
         return;
     }
 
-    // CÁLCULO DEL TOTAL
+    // CÁLCULO DEL TOTAL    
     const totalMonto = gastos.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
     totalGastosElement.textContent = `$${totalMonto.toFixed(2)}`;
     
-    // --- LÓGICA DEL GRÁFICO (NUEVO) ---
+    // LÓGICA DEL GRÁFICO DE DISTRIBUCIÓN
     renderChart(gastos);
-    // -----------------------------------
+    
+    // --- LÓGICA DEL GRÁFICO DE TENDENCIA (NUEVO) ---
+    renderTrendChart(gastos, trendGranularity);
+    // ------------------------------------------------
 
     renderGastos(gastos);
 }
@@ -408,6 +417,26 @@ filterCategoria.addEventListener('change', () => {
     obtenerGastos(selectedCategory);
 });
 
+/**
+ * UX: Listener para cambiar la granularidad del gráfico de tendencia.
+ */
+trendButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        // Remover clase 'active' de todos los botones
+        trendButtons.forEach(btn => btn.classList.remove('active', 'btn-info'));
+        
+        // Añadir clase 'active' al botón presionado
+        button.classList.add('active', 'btn-info');
+        
+        // Actualizar la variable global y renderizar de nuevo
+        trendGranularity = button.dataset.granularity;
+        obtenerGastos(filterCategoria.value); // Recarga los datos y llama a renderTrendChart
+    });
+});
+
+// Inicializar el botón de 'Día' como activo (ya que el estado inicial es 'day')
+document.getElementById('trend-day').classList.add('btn-info');
+
 
 // ==============================================
 // FASE 5: Realtime 
@@ -481,6 +510,81 @@ function renderChart(gastos) {
                 title: {
                     display: true,
                     text: 'Distribución Porcentual del Gasto',
+                    font: { size: 14 }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * UX: Procesa los gastos y renderiza el gráfico de línea de tendencia.
+ * @param {Array} gastos - La lista de gastos del usuario.
+ * @param {string} granularity - La granularidad ('day', 'month', 'year').
+ */
+function renderTrendChart(gastos, granularity) {
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    
+    // Función helper para formatear la fecha según la granularidad
+    const formatLabel = (date) => {
+        const d = new Date(date);
+        switch (granularity) {
+            case 'year':
+                return d.getFullYear();
+            case 'month':
+                return d.toLocaleString('es-ES', { year: 'numeric', month: 'short' });
+            case 'day':
+            default:
+                return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'numeric', day: 'numeric' });
+        }
+    };
+    
+    // 1. Agrupar montos por la clave de tiempo (día, mes, o año)
+    const trendData = gastos.reduce((acc, gasto) => {
+        const monto = parseFloat(gasto.monto);
+        const dateKey = formatLabel(gasto.fecha);
+        
+        if (acc[dateKey]) {
+            acc[dateKey] += monto;
+        } else {
+            acc[dateKey] = monto;
+        }
+        return acc;
+    }, {});
+
+    const labels = Object.keys(trendData).sort();
+    const data = labels.map(label => trendData[label]);
+
+    // 2. Crear el gráfico de línea
+    trendChart = new Chart(trendChartCanvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gasto Total',
+                data: data,
+                borderColor: '#17a2b8', // Color info de Bootstrap
+                backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Monto ($)' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: `Gasto Agrupado por ${granularity.toUpperCase()}`,
                     font: { size: 14 }
                 }
             }

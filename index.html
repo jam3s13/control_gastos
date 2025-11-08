@@ -66,6 +66,22 @@
         </div>
 
         <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <span>📉 Tendencia de Gasto</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-light active" data-granularity="day" id="trend-day">Día</button>
+                    <button type="button" class="btn btn-light" data-granularity="month" id="trend-month">Mes</button>
+                    <button type="button" class="btn btn-light" data-granularity="year" id="trend-year">Año</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="height: 300px;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
             <div class="card-header bg-success text-white">
                 ➕ Agregar Nuevo Gasto
             </div>
