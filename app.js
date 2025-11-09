@@ -65,12 +65,15 @@ let trendChart = null; // Variable global para almacenar la instancia del gráfi
 let trendGranularity = 'day'; // Estado inicial: agrupar por día
 
 // Estado de Ordenamiento (NUEVO)
-let currentSortColumn = 'fecha'; // Columna por defecto
+let currentSortColumn = 'gasto_fecha'; // <--- CAMBIO AQUÍ
 let currentSortOrder = 'desc'; // Orden por defecto (descendente)
+
+// Fecha (NUEVO)
+const gastoFechaInput = document.getElementById('gasto-fecha');
+const editGastoFecha = document.getElementById('edit-gasto-fecha');
 
 // Variables de Estado
 let isSignInMode = true;
-
 // ----------------------------------------------
 // FUNCIONES HELPER (Manejo de Errores y Carga)
 // ----------------------------------------------
@@ -217,7 +220,7 @@ async function obtenerGastos(categoriaFilter = 'ALL') {
     
     let query = supabase
         .from('gastos')
-        .select('monto, descripcion, categoria, fecha, id');
+        .select('monto, descripcion, categoria, gasto_fecha, id');
         // El ordenamiento se mueve después del filtrado
 
     // LÓGICA DE FILTRADO
@@ -260,7 +263,8 @@ function renderGastos(gastos) {
         row.dataset.id = gasto.id;
 
         const formattedMonto = `$${parseFloat(gasto.monto).toFixed(2)}`;
-        const formattedDate = new Date(gasto.fecha).toLocaleDateString('es-ES');
+        const formattedDate = new Date(gasto.gasto_fecha + 'T00:00:00').toLocaleDateString('es-ES');
+
 
         row.insertCell(0).textContent = formattedMonto;
         row.insertCell(1).textContent = gasto.descripcion;
@@ -291,12 +295,14 @@ gastoForm.onsubmit = async (e) => {
     const montoInput = document.getElementById('gasto-monto');
     const descripcionInput = document.getElementById('gasto-descripcion');
     const categoriaInput = document.getElementById('gasto-categoria');
+    const gastoFecha = gastoFechaInput.value;
 
     const nuevoGasto = {
         user_id: user.id,
         monto: parseFloat(montoInput.value),
         descripcion: descripcionInput.value,
         categoria: categoriaInput.value,
+        gasto_fecha: gastoFecha, // <--- CAMBIO AQUÍ
     };
 
     toggleLoading(gastoSubmitButton, true, 'Guardar Gasto');
@@ -354,6 +360,7 @@ gastosList.onclick = async (e) => {
         editGastoMonto.value = gasto.monto;
         editGastoDescripcion.value = gasto.descripcion;
         editGastoCategoria.value = gasto.categoria;
+        editGastoFecha.value = gasto.gasto_fecha;
         editGastoModal.show();
     }
 };
@@ -395,6 +402,7 @@ editGastoForm.onsubmit = async (e) => {
         monto: parseFloat(editGastoMonto.value),
         descripcion: editGastoDescripcion.value,
         categoria: editGastoCategoria.value,
+        gasto_fecha: editGastoFecha.value, // <--- CAMBIO AQUÍ
     };
     
     toggleLoading(saveButton, true, 'Guardar Cambios');
@@ -556,7 +564,7 @@ function renderTrendChart(gastos, granularity) {
     
     // Función helper para formatear la fecha según la granularidad
     const formatLabel = (date) => {
-        const d = new Date(date);
+        const d = new Date(date + 'T00:00:00');
         switch (granularity) {
             case 'year':
                 return d.getFullYear();
@@ -571,7 +579,7 @@ function renderTrendChart(gastos, granularity) {
     // 1. Agrupar montos por la clave de tiempo (día, mes, o año)
     const trendData = gastos.reduce((acc, gasto) => {
         const monto = parseFloat(gasto.monto);
-        const dateKey = formatLabel(gasto.fecha);
+        const dateKey = formatLabel(gasto.gasto_fecha);
         
         if (acc[dateKey]) {
             acc[dateKey] += monto;
