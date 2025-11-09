@@ -1,0 +1,24 @@
+
+        body { 
+            background-color: #e9ecef; /* Fondo más suave */
+        }
+        .card-auth { 
+            max-width: 400px; 
+            margin: 50px auto; 
+        }
+        .app-container { 
+            margin-top: 20px; 
+            margin-bottom: 40px;
+        }
+        .sidebar {
+            position: sticky; /* Fija la columna de análisis */
+            top: 20px;
+        }
+        .chart-container {
+            height: 280px; /* Altura fija para gráficos */
+        }
+        /* Estilo para hacer los encabezados de tabla clicables */
+        .sortable {
+            cursor: pointer; 
+            user-select: none;
+        }
