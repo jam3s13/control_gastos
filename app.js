@@ -28,11 +28,35 @@ const gastoForm = document.getElementById('gasto-form');
 const gastosList = document.getElementById('gastos-list');
 const gastoSubmitButton = document.getElementById('gasto-button'); 
 
-// Totales (Nuevo)
+// Totales
 const totalGastosElement = document.getElementById('total-gastos');
 
-// Filtrado (Nuevo)
+// Filtrado
 const filterCategoria = document.getElementById('filter-categoria');
+
+// Ordenamiento
+let currentSortColumn = 'gasto_fecha'; // Columna por defecto (Fecha de Gasto)
+let currentSortOrder = 'desc'; // Orden por defecto (descendente)
+
+// Gráfico de Distribución
+const categoryChartCanvas = document.getElementById('categoryChart');
+let categoryChart = null; 
+
+// Gráfico de Tendencia
+const trendChartCanvas = document.getElementById('trendChart');
+const trendButtons = document.querySelectorAll('.btn-group button[data-granularity]');
+let trendChart = null; 
+let trendGranularity = 'day'; // Estado inicial: agrupar por día
+
+// Fecha
+const gastoFechaInput = document.getElementById('gasto-fecha');
+const editGastoFecha = document.getElementById('edit-gasto-fecha');
+
+// Paginación (NUEVO)
+const paginationControls = document.getElementById('pagination-controls');
+const PAGE_SIZE = 10; // Número fijo de gastos por página
+let currentPage = 1; // Página actual
+let totalPages = 1; // Total de páginas disponibles
 
 // Edición Modal (Fase 4)
 const editGastoModalElement = document.getElementById('editGastoModal');
@@ -54,26 +78,9 @@ const successModalElement = document.getElementById('successModal');
 const successModal = new bootstrap.Modal(successModalElement);
 const successMessage = document.getElementById('success-message');
 
-// Gráfico (NUEVO)
-const categoryChartCanvas = document.getElementById('categoryChart');
-let categoryChart = null; // Variable global para almacenar la instancia del gráfico
-
-// Gráfico de Tendencia (NUEVO)
-const trendChartCanvas = document.getElementById('trendChart');
-const trendButtons = document.querySelectorAll('.btn-group button[data-granularity]');
-let trendChart = null; // Variable global para almacenar la instancia del gráfico de tendencia
-let trendGranularity = 'day'; // Estado inicial: agrupar por día
-
-// Estado de Ordenamiento (NUEVO)
-let currentSortColumn = 'gasto_fecha'; // <--- CAMBIO AQUÍ
-let currentSortOrder = 'desc'; // Orden por defecto (descendente)
-
-// Fecha (NUEVO)
-const gastoFechaInput = document.getElementById('gasto-fecha');
-const editGastoFecha = document.getElementById('edit-gasto-fecha');
-
 // Variables de Estado
 let isSignInMode = true;
+
 // ----------------------------------------------
 // FUNCIONES HELPER (Manejo de Errores y Carga)
 // ----------------------------------------------
@@ -131,7 +138,11 @@ function toggleUI(loggedIn) {
         authContainer.classList.add('d-none');
         appContainer.classList.remove('d-none');
         setupRealtime();
-        obtenerGastos(filterCategoria.value); // Llama con el filtro inicial
+        // Inicializa el botón de tendencia y llama a obtenerGastos con el filtro/ordenamiento actual
+        document.getElementById('trend-day').classList.add('btn-info');
+        // Aseguramos que la página se restablezca a 1 al cargar
+        currentPage = 1; 
+        obtenerGastos(filterCategoria.value); 
     } else {
         authContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
@@ -207,48 +218,89 @@ checkUser();
 
 
 // ==============================================
-// FASES 3, 4, 5: CRUD, Totales y Filtrado
+// FASES 3, 4, 5: CRUD, Totales, Filtrado y Gráficos
 // ==============================================
 
 /**
- * FASE 3/UX: Obtiene, calcula el total, filtra, ordena y renderiza la lista de gastos.
+ * FASE 3/UX: Obtiene, calcula el total, filtra, ordena, pagina y renderiza la lista de gastos.
+ * * ⚠️ CORRECCIÓN CLAVE: Se separa la consulta en dos: una para el Análisis (todos los gastos)
+ * y otra para la Visualización (gastos de la página actual).
  */
 async function obtenerGastos(categoriaFilter = 'ALL') {
     gastosList.innerHTML = '<tr><td colspan="5" class="text-center">Cargando gastos...</td></tr>';
+    totalGastosElement.textContent = 'S/0.00'; 
     
-    totalGastosElement.textContent = '$0.00'; 
-    
-    let query = supabase
+    // --- QUERY 1: Obtener TODOS los datos necesarios para ANÁLISIS, Totales y Conteo ---
+    let analysisQuery = supabase
         .from('gastos')
-        .select('monto, descripcion, categoria, gasto_fecha, id');
-        // El ordenamiento se mueve después del filtrado
-
-    // LÓGICA DE FILTRADO
+        // Solo necesitamos estos campos para Charts y Totales. Pedimos el conteo total.
+        .select('monto, descripcion, categoria, gasto_fecha', { count: 'exact' }); 
+        
+    // LÓGICA DE FILTRADO (debe aplicarse a ambas consultas)
     if (categoriaFilter !== 'ALL') {
-        query = query.eq('categoria', categoriaFilter);
+        analysisQuery = analysisQuery.eq('categoria', categoriaFilter);
     }
     
-    // --- LÓGICA DE ORDENAMIENTO (NUEVO) ---
-    const isAscending = currentSortOrder === 'asc';
-    query = query.order(currentSortColumn, { ascending: isAscending });
-    // ----------------------------------------
+    // Ejecutar la consulta de análisis (sin paginación)
+    const { data: allGastosForAnalysis, error: analysisError, count: totalCount } = await analysisQuery;
 
-    const { data: gastos, error } = await query;
-
-    if (error) {
-        console.error("Error al cargar gastos:", error.message);
-        gastosList.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+    if (analysisError) {
+        console.error("Error al cargar datos de análisis:", analysisError.message);
+        gastosList.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${analysisError.message}</td></tr>`;
         return;
     }
-
-    const totalMonto = gastos.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
-    totalGastosElement.textContent = `$${totalMonto.toFixed(2)}`;
     
-    renderChart(gastos);
-    renderTrendChart(gastos, trendGranularity);
+    // 1. CÁLCULO DE PÁGINAS y TOTALES (Usando el conteo total)
+    const totalItems = totalCount || 0;
+    totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    
+    // Si la página actual excede el nuevo total de páginas, vamos a la última página válida
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    
+    // CÁLCULO DEL TOTAL (Usando TODOS los gastos)
+    const totalMonto = allGastosForAnalysis.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
+    totalGastosElement.textContent = `S/ ${totalMonto.toFixed(2)}`;
 
-    renderGastos(gastos);
-    updateSortIndicators(); // Llama a la nueva función
+    // RENDERIZADO DE GRÁFICOS (Usando TODOS los gastos)
+    renderChart(allGastosForAnalysis);
+    renderTrendChart(allGastosForAnalysis, trendGranularity);
+    renderPaginationControls(); // Actualiza los controles antes de dibujar la tabla
+
+
+    // --- QUERY 2: Obtener los datos para la TABLA (con Paginación) ---
+    const offset = (currentPage - 1) * PAGE_SIZE;
+    const limit = PAGE_SIZE - 1; // Supabase es inclusivo (ej: 0 a 9)
+    
+    let displayQuery = supabase
+        .from('gastos')
+        // Seleccionamos todos los campos necesarios para la tabla
+        .select('monto, descripcion, categoria, gasto_fecha, id'); 
+    
+    // LÓGICA DE FILTRADO (debe aplicarse)
+    if (categoriaFilter !== 'ALL') {
+        displayQuery = displayQuery.eq('categoria', categoriaFilter);
+    }
+    
+    // LÓGICA DE ORDENAMIENTO (debe aplicarse)
+    const isAscending = currentSortOrder === 'asc';
+    displayQuery = displayQuery.order(currentSortColumn, { ascending: isAscending });
+
+    // LÓGICA DE PAGINACIÓN: Aplicar el rango
+    displayQuery = displayQuery.range(offset, offset + limit);
+
+    const { data: gastosForDisplay, error: displayError } = await displayQuery;
+
+    if (displayError) {
+        console.error("Error al cargar gastos para mostrar:", displayError.message);
+        gastosList.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error al cargar la tabla: ${displayError.message}</td></tr>`;
+        return;
+    }
+    
+    // RENDERIZADO DE LA TABLA
+    renderGastos(gastosForDisplay);
+    updateSortIndicators();
 }
 
 function renderGastos(gastos) {
@@ -262,14 +314,15 @@ function renderGastos(gastos) {
         const row = gastosList.insertRow();
         row.dataset.id = gasto.id;
 
-        const formattedMonto = `$${parseFloat(gasto.monto).toFixed(2)}`;
+        const formattedMonto = `S/${parseFloat(gasto.monto).toFixed(2)}`;
+        
+        // SOLUCIÓN DE ZONA HORARIA: Agregamos 'T00:00:00' para evitar que JS retroceda la fecha un día.
         const formattedDate = new Date(gasto.gasto_fecha + 'T00:00:00').toLocaleDateString('es-ES');
-
 
         row.insertCell(0).textContent = formattedMonto;
         row.insertCell(1).textContent = gasto.descripcion;
         row.insertCell(2).textContent = gasto.categoria;
-        row.insertCell(3).textContent = formattedDate;
+        row.insertCell(3).textContent = formattedDate; // La columna 3 es la fecha
 
         const actionsCell = row.insertCell(4);
         actionsCell.innerHTML = `
@@ -278,6 +331,194 @@ function renderGastos(gastos) {
         `;
     });
 }
+
+/**
+ * UX: Dibuja los controles de paginación (botones).
+ */
+function renderPaginationControls() {
+    paginationControls.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+
+    // Botón Anterior
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" data-page="${currentPage - 1}">Anterior</a>`;
+    paginationControls.appendChild(prevLi);
+
+    // Botones de Página (mostrar un rango limitado)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+        paginationControls.appendChild(li);
+    }
+    
+    // Mostrar puntos suspensivos si es necesario
+    if (endPage < totalPages) {
+        const dotsLi = document.createElement('li');
+        dotsLi.className = 'page-item disabled';
+        dotsLi.innerHTML = `<span class="page-link">...</span>`;
+        paginationControls.appendChild(dotsLi);
+    }
+    
+    // Botón Siguiente
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" data-page="${currentPage + 1}">Siguiente</a>`;
+    paginationControls.appendChild(nextLi);
+}
+
+
+/**
+ * UX: Procesa los gastos y renderiza el gráfico de pastel por categoría.
+ */
+function renderChart(gastos) {
+    const categoryTotals = gastos.reduce((acc, gasto) => {
+        const monto = parseFloat(gasto.monto);
+        if (acc[gasto.categoria]) {
+            acc[gasto.categoria] += monto;
+        } else {
+            acc[gasto.categoria] = monto;
+        }
+        return acc;
+    }, {});
+
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
+
+    const colors = {
+        'Alimentación': '#dc3545', // Rojo
+        'Transporte': '#0d6efd', // Azul
+        'Vivienda': '#ffc107', // Amarillo
+        'Entretenimiento': '#17a2b8', // Info (Cian)
+        'Otros': '#6c757d', // Gris
+    };
+    
+    const backgroundColors = labels.map(label => colors[label] || '#CCCCCC');
+
+    if (categoryChart) {
+        categoryChart.destroy();
+    }
+
+    categoryChart = new Chart(categoryChartCanvas, {
+        type: 'doughnut', 
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: {
+                    display: true,
+                    text: 'Distribución Porcentual del Gasto',
+                    font: { size: 14 }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * UX: Procesa los gastos y renderiza el gráfico de línea de tendencia.
+ */
+function renderTrendChart(gastos, granularity) {
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    
+    // Función helper para formatear la fecha según la granularidad
+    const formatLabel = (date) => {
+        // SOLUCIÓN DE ZONA HORARIA: Forzar la medianoche local para evitar desfases
+        const d = new Date(date + 'T00:00:00'); 
+        
+        switch (granularity) {
+            case 'año':
+                return d.getFullYear();
+            case 'mes':
+                // Nota: Usamos ISO (YYYY-MM) para asegurar el ordenamiento correcto en el switch:
+                return d.toISOString().substring(0, 7); 
+            case 'dia':
+            default:
+                // Nota: Usamos ISO (YYYY-MM-DD) para asegurar el ordenamiento correcto en el switch:
+                return date; // Ya viene como YYYY-MM-DD
+        }
+    };
+    
+    // 1. Agrupar montos por la clave de tiempo (usando gasto_fecha)
+    const trendData = gastos.reduce((acc, gasto) => {
+        const monto = parseFloat(gasto.monto);
+        const dateKey = formatLabel(gasto.gasto_fecha); 
+        
+        if (acc[dateKey]) {
+            acc[dateKey] += monto;
+        } else {
+            acc[dateKey] = monto;
+        }
+        return acc;
+    }, {});
+
+    // 2. ORDENAMIENTO CRONOLÓGICO:
+    // Ahora las claves son YYYY-MM-DD o YYYY-MM, que se ordenan correctamente como texto (alfabéticamente).
+    const sortedLabels = Object.keys(trendData).sort();
+    const data = sortedLabels.map(label => trendData[label]);
+    
+    // 3. Formatear las etiquetas para visualización si es necesario (solo si se agrupa por mes)
+    const labels = sortedLabels.map(label => {
+        if (granularity === 'month') {
+             // Convertimos de YYYY-MM a "Dic. 2025" para la visualización final
+             const [year, month] = label.split('-');
+             const d = new Date(year, month - 1); // mes - 1 porque JS es base 0
+             return d.toLocaleString('es-ES', { year: 'numeric', month: 'short' });
+        }
+        return label; // Días ya están bien (YYYY-MM-DD)
+    });
+
+    // 4. Crear el gráfico de línea
+    trendChart = new Chart(trendChartCanvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gasto Total',
+                data: data,
+                borderColor: '#17a2b8', 
+                backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Monto (S/)' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: `Gasto Agrupado por ${granularity.toUpperCase()}`,
+                    font: { size: 12 }
+                }
+            }
+        }
+    });
+}
+
 
 /**
  * FASE 3/UX: Agrega un nuevo gasto.
@@ -295,14 +536,14 @@ gastoForm.onsubmit = async (e) => {
     const montoInput = document.getElementById('gasto-monto');
     const descripcionInput = document.getElementById('gasto-descripcion');
     const categoriaInput = document.getElementById('gasto-categoria');
-    const gastoFecha = gastoFechaInput.value;
+    const gastoFecha = gastoFechaInput.value; 
 
     const nuevoGasto = {
         user_id: user.id,
         monto: parseFloat(montoInput.value),
         descripcion: descripcionInput.value,
         categoria: categoriaInput.value,
-        gasto_fecha: gastoFecha, // <--- CAMBIO AQUÍ
+        gasto_fecha: gastoFecha, 
     };
 
     toggleLoading(gastoSubmitButton, true, 'Guardar Gasto');
@@ -316,8 +557,7 @@ gastoForm.onsubmit = async (e) => {
     if (error) {
         showAppAlert(`Error al agregar gasto: ${error.message}. Verifica tus permisos (RLS).`, 'danger');
     } else {
-        // Manejo de éxito con Modal
-        successMessage.textContent = `Monto: $${nuevoGasto.monto.toFixed(2)} - Categoría: ${nuevoGasto.categoria}`;
+        successMessage.textContent = `Monto: S/${nuevoGasto.monto.toFixed(2)} - Categoría: ${nuevoGasto.categoria} (Fecha: ${new Date(gastoFecha + 'T00:00:00').toLocaleDateString('es-ES')})`;
         successModal.show();
         
         gastoForm.reset();
@@ -335,9 +575,8 @@ gastosList.onclick = async (e) => {
     if (!gastoId) return;
 
     if (target.classList.contains('delete-btn')) {
-        // Abre el modal de confirmación de eliminación de Bootstrap
-        confirmDeleteId.value = gastoId;
         deleteConfirmModal.show();
+        confirmDeleteId.value = gastoId;
         
     } else if (target.classList.contains('edit-btn')) {
         target.disabled = true; 
@@ -360,7 +599,8 @@ gastosList.onclick = async (e) => {
         editGastoMonto.value = gasto.monto;
         editGastoDescripcion.value = gasto.descripcion;
         editGastoCategoria.value = gasto.categoria;
-        editGastoFecha.value = gasto.gasto_fecha;
+        editGastoFecha.value = gasto.gasto_fecha; // Carga la fecha sin desfase
+
         editGastoModal.show();
     }
 };
@@ -402,7 +642,7 @@ editGastoForm.onsubmit = async (e) => {
         monto: parseFloat(editGastoMonto.value),
         descripcion: editGastoDescripcion.value,
         categoria: editGastoCategoria.value,
-        gasto_fecha: editGastoFecha.value, // <--- CAMBIO AQUÍ
+        gasto_fecha: editGastoFecha.value,
     };
     
     toggleLoading(saveButton, true, 'Guardar Cambios');
@@ -423,29 +663,18 @@ editGastoForm.onsubmit = async (e) => {
 };
 
 /**
- * FASE 5: Event Listener para el filtro de categoría.
+ * UX: Actualiza las flechas indicadoras de orden en los encabezados.
  */
-filterCategoria.addEventListener('change', () => {
-    const selectedCategory = filterCategoria.value;
-    obtenerGastos(selectedCategory);
-});
-
-/**
- * UX: Listener para cambiar la granularidad del gráfico de tendencia.
- */
-trendButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        // Remover clase 'active' de todos los botones
-        trendButtons.forEach(btn => btn.classList.remove('active', 'btn-info'));
-        
-        // Añadir clase 'active' al botón presionado
-        button.classList.add('active', 'btn-info');
-        
-        // Actualizar la variable global y renderizar de nuevo
-        trendGranularity = button.dataset.granularity;
-        obtenerGastos(filterCategoria.value); // Recarga los datos y llama a renderTrendChart
+function updateSortIndicators() {
+    document.querySelectorAll('.sortable span').forEach(span => {
+        span.textContent = '';
     });
-});
+
+    const indicator = document.getElementById(`sort-${currentSortColumn}`);
+    if (indicator) {
+        indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
+    }
+}
 
 /**
  * UX: Listener para hacer clic en los encabezados de la tabla.
@@ -457,20 +686,58 @@ document.querySelector('#app-container table thead').addEventListener('click', (
     const newSortColumn = header.dataset.sort;
 
     if (newSortColumn === currentSortColumn) {
-        // Si es la misma columna, simplemente invertimos el orden
         currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
     } else {
-        // Si es una columna nueva, cambiamos la columna y reiniciamos a descendente
         currentSortColumn = newSortColumn;
         currentSortOrder = 'desc'; 
     }
-
-    // Recargar la lista de gastos con los nuevos parámetros de ordenamiento
+    
+    // Al ordenar, volvemos a la página 1
+    currentPage = 1;
     obtenerGastos(filterCategoria.value);
 });
 
-// Inicializar el botón de 'Día' como activo (ya que el estado inicial es 'day')
-document.getElementById('trend-day').classList.add('btn-info');
+
+/**
+ * FASE 5: Event Listener para el filtro de categoría.
+ */
+filterCategoria.addEventListener('change', () => {
+    const selectedCategory = filterCategoria.value;
+    // Al filtrar, volvemos a la página 1
+    currentPage = 1;
+    obtenerGastos(selectedCategory);
+});
+
+/**
+ * UX: Listener para cambiar la granularidad del gráfico de tendencia.
+ */
+trendButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        trendButtons.forEach(btn => btn.classList.remove('active', 'btn-info'));
+        
+        button.classList.add('active', 'btn-info');
+        
+        trendGranularity = button.dataset.granularity;
+        obtenerGastos(filterCategoria.value);
+    });
+});
+
+/**
+ * UX: Listener para cambiar la página al hacer clic en los botones.
+ */
+paginationControls.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = e.target.closest('.page-link');
+    if (!target) return;
+    
+    const newPage = parseInt(target.dataset.page);
+    
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+        currentPage = newPage;
+        // Recargar la lista con la nueva página
+        obtenerGastos(filterCategoria.value); 
+    }
+});
 
 
 // ==============================================
@@ -482,163 +749,8 @@ function setupRealtime() {
         .channel('gastos_channel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, (payload) => {
             console.log(`Cambio Realtime (${payload.eventType}) detectado. Recargando lista...`);
-            
-            // Llama a obtenerGastos con el filtro actualmente seleccionado
+            // Al detectar un cambio, aseguramos que la página se mantenga o salte si es necesario
             obtenerGastos(filterCategoria.value); 
         })
         .subscribe();
-};
-
-/**
- * UX: Procesa los gastos y renderiza el gráfico de pastel por categoría.
- * @param {Array} gastos - La lista de gastos del usuario.
- */
-function renderChart(gastos) {
-    // 1. Agrupar montos por categoría
-    const categoryTotals = gastos.reduce((acc, gasto) => {
-        const monto = parseFloat(gasto.monto);
-        if (acc[gasto.categoria]) {
-            acc[gasto.categoria] += monto;
-        } else {
-            acc[gasto.categoria] = monto;
-        }
-        return acc;
-    }, {});
-
-    const labels = Object.keys(categoryTotals);
-    const data = Object.values(categoryTotals);
-
-    // Colores predefinidos para las categorías
-    const colors = {
-        'Alimentación': '#FF6384',
-        'Transporte': '#36A2EB',
-        'Vivienda': '#FFCE56',
-        'Entretenimiento': '#4BC0C0',
-        'Otros': '#9966FF',
-    };
-    
-    const backgroundColors = labels.map(label => colors[label] || '#CCCCCC');
-
-    // 2. Destruir el gráfico anterior si existe
-    if (categoryChart) {
-        categoryChart.destroy();
-    }
-
-    // 3. Crear el nuevo gráfico de pastel
-    categoryChart = new Chart(categoryChartCanvas, {
-        type: 'doughnut', // Gráfico de rosquilla o pastel
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: backgroundColors,
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                },
-                title: {
-                    display: true,
-                    text: 'Distribución Porcentual del Gasto',
-                    font: { size: 14 }
-                }
-            }
-        }
-    });
-}
-
-/**
- * UX: Procesa los gastos y renderiza el gráfico de línea de tendencia.
- * @param {Array} gastos - La lista de gastos del usuario.
- * @param {string} granularity - La granularidad ('day', 'month', 'year').
- */
-function renderTrendChart(gastos, granularity) {
-    if (trendChart) {
-        trendChart.destroy();
-    }
-    
-    // Función helper para formatear la fecha según la granularidad
-    const formatLabel = (date) => {
-        const d = new Date(date + 'T00:00:00');
-        switch (granularity) {
-            case 'year':
-                return d.getFullYear();
-            case 'month':
-                return d.toLocaleString('es-ES', { year: 'numeric', month: 'short' });
-            case 'day':
-            default:
-                return d.toLocaleDateString('es-ES', { year: 'numeric', month: 'numeric', day: 'numeric' });
-        }
-    };
-    
-    // 1. Agrupar montos por la clave de tiempo (día, mes, o año)
-    const trendData = gastos.reduce((acc, gasto) => {
-        const monto = parseFloat(gasto.monto);
-        const dateKey = formatLabel(gasto.gasto_fecha);
-        
-        if (acc[dateKey]) {
-            acc[dateKey] += monto;
-        } else {
-            acc[dateKey] = monto;
-        }
-        return acc;
-    }, {});
-
-    const labels = Object.keys(trendData).sort();
-    const data = labels.map(label => trendData[label]);
-
-    // 2. Crear el gráfico de línea
-    trendChart = new Chart(trendChartCanvas, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Gasto Total',
-                data: data,
-                borderColor: '#17a2b8', // Color info de Bootstrap
-                backgroundColor: 'rgba(23, 162, 184, 0.1)',
-                fill: true,
-                tension: 0.2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Monto ($)' }
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                title: {
-                    display: true,
-                    text: `Gasto Agrupado por ${granularity.toUpperCase()}`,
-                    font: { size: 14 }
-                }
-            }
-        }
-    });
-};
-
-/**
- * UX: Actualiza las flechas indicadoras de orden en los encabezados.
- */
-function updateSortIndicators() {
-    // 1. Limpiar todos los indicadores
-    document.querySelectorAll('.sortable span').forEach(span => {
-        span.textContent = '';
-    });
-
-    // 2. Establecer el indicador actual
-    const indicator = document.getElementById(`sort-${currentSortColumn}`);
-    if (indicator) {
-        indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
-    }
 }

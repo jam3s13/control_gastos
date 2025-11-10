@@ -43,10 +43,8 @@
             <button id="signout-button" class="btn btn-outline-danger btn-sm">Cerrar Sesión</button>
         </header>
         
-        <div class="row">
-            
+        <div class="row"> 
             <div class="col-md-8">
-
                 <div class="card mb-4 shadow-sm">
                     <div class="card-header bg-primary text-white">
                         ➕ Registrar Nuevo Gasto
@@ -54,8 +52,8 @@
                     <div class="card-body">
                         <form id="gasto-form" class="row g-3 needs-validation" novalidate>
                             <div class="col-md-3">
-                                <label for="gasto-monto" class="form-label">Monto ($)</label>
-                                <input type="number" step="0.01" class="form-control" id="gasto-monto" required>
+                                <label for="gasto-monto" class="form-label">Monto (S/)</label>
+                                <input type="number" step="0.1" class="form-control" id="gasto-monto" required>
                                 <div class="invalid-feedback">Monto obligatorio.</div>
                             </div>
                             <div class="col-md-5">
@@ -69,7 +67,7 @@
                                     <option value="" disabled selected>Seleccione...</option>
                                     <option value="Alimentación">Alimentación</option>
                                     <option value="Transporte">Transporte</option>
-                                    <option value="Vivienda">Vivienda</option>
+                                    <option value="Vivienda">Alquiler</option>
                                     <option value="Entretenimiento">Entretenimiento</option>
                                     <option value="Otros">Otros</option>
                                 </select>
@@ -98,7 +96,7 @@
                                 <option value="ALL" selected>Todas</option>
                                 <option value="Alimentación">Alimentación</option>
                                 <option value="Transporte">Transporte</option>
-                                <option value="Vivienda">Vivienda</option>
+                                <option value="Vivienda">Alquiler</option>
                                 <option value="Entretenimiento">Entretenimiento</option>
                                 <option value="Otros">Otros</option>
                             </select>
@@ -120,6 +118,20 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <div class="card shadow-sm">
+                    <div class="card-body">
+                        <table class="table table-striped table-hover">
+                            </table>
+                        
+                        <nav aria-label="Navegación de gastos">
+                            <ul class="pagination justify-content-center" id="pagination-controls">
+                                </ul>
+                        </nav>
+
+                    </div>
+                </div>
+
                 </div>
             </div>
 
@@ -129,7 +141,7 @@
                     <div class="card mb-4 shadow-sm bg-success text-white">
                         <div class="card-body">
                             <h5 class="card-title text-white-50">Gasto Total Acumulado:</h5>
-                            <h1 class="card-text" id="total-gastos">$0.00</h1>
+                            <h1 class="card-text" id="total-gastos">S/0.00</h1>
                         </div>
                     </div>
 
@@ -148,9 +160,9 @@
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <span>📉 Tendencia de Gasto</span>
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-light active" data-granularity="day" id="trend-day">Día</button>
-                                <button type="button" class="btn btn-light" data-granularity="month" id="trend-month">Mes</button>
-                                <button type="button" class="btn btn-light" data-granularity="year" id="trend-year">Año</button>
+                                <button type="button" class="btn btn-light active" data-granularity="dia" id="trend-day">Día</button>
+                                <button type="button" class="btn btn-light" data-granularity="mes" id="trend-month">Mes</button>
+                                <button type="button" class="btn btn-light" data-granularity="año" id="trend-year">Año</button>
                             </div>
                         </div>
                         <div class="card-body">
@@ -176,7 +188,7 @@
             <div class="modal-body">
                 <input type="hidden" id="edit-gasto-id">
                 <div class="mb-3">
-                    <label for="edit-gasto-monto" class="form-label">Monto ($)</label>
+                    <label for="edit-gasto-monto" class="form-label">Monto (S/)</label>
                     <input type="number" step="0.01" class="form-control" id="edit-gasto-monto" required>
                     <div class="invalid-feedback">El monto es obligatorio.</div>
                 </div>
@@ -190,7 +202,7 @@
                     <select class="form-select" id="edit-gasto-categoria" required>
                         <option value="Alimentación">Alimentación</option>
                         <option value="Transporte">Transporte</option>
-                        <option value="Vivienda">Vivienda</option>
+                        <option value="Vivienda">Alquiler</option>
                         <option value="Entretenimiento">Entretenimiento</option>
                         <option value="Otros">Otros</option>
                     </select>
