@@ -1,756 +1,516 @@
+/**
+ * GESTOR DE GASTOS - LOGICA PRINCIPAL
+ * Integración: Supabase + Chart.js + SweetAlert2
+ */
+
 // ==============================================
-// FASE 1: Inicialización y Variables Globales
+// 1. CONFIGURACIÓN E INICIALIZACIÓN
 // ==============================================
 
-// ⚠️ REEMPLAZA CON TUS CLAVES DE SUPABASE ⚠️
 const SUPABASE_URL = 'https://kjytkmuuyvwrcurzvsjq.supabase.co'; 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqeXRrbXV1eXZ3cmN1cnp2c2pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNDM2NDksImV4cCI6MjA5MjgxOTY0OX0.W42dgmh-j5u6K8-daCTAupXFUR13P2yRLX0hQRvEX5I';
+const SUPABASE_ANON_KEY = 'sb_publishable_HCaLtZlqKdWhSsHF1rOgXg_tnkyfDcV'; // Mantén tu clave segura
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Inicialización corregida del cliente Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ----------------------------------------------
-// Referencias al DOM
-// ----------------------------------------------
-
-// Auth (Fase 2)
+// Referencias DOM Globales
 const authContainer = document.getElementById('auth-container');
 const appContainer = document.getElementById('app-container');
-const authTitle = document.getElementById('auth-title');
-const authButton = document.getElementById('auth-button');
-const toggleAuthLink = document.getElementById('toggle-auth');
-const authForm = document.getElementById('auth-form');
-const alertAuth = document.getElementById('alert-auth'); 
-const signoutButton = document.getElementById('signout-button');
-
-// Aplicación (Fases 3 y 4)
-const gastoForm = document.getElementById('gasto-form');
 const gastosList = document.getElementById('gastos-list');
-const gastoSubmitButton = document.getElementById('gasto-button'); 
-
-// Totales
 const totalGastosElement = document.getElementById('total-gastos');
 
-// Filtrado
-const filterCategoria = document.getElementById('filter-categoria');
+// Estado Global de la App
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let totalPages = 1;
+let currentSortColumn = 'gasto_fecha';
+let currentSortOrder = 'desc';
+let trendGranularity = 'dia';
 
-// Ordenamiento
-let currentSortColumn = 'gasto_fecha'; // Columna por defecto (Fecha de Gasto)
-let currentSortOrder = 'desc'; // Orden por defecto (descendente)
-
-// Gráfico de Distribución
-const categoryChartCanvas = document.getElementById('categoryChart');
-let categoryChart = null; 
-
-// Gráfico de Tendencia
-const trendChartCanvas = document.getElementById('trendChart');
-const trendButtons = document.querySelectorAll('.btn-group button[data-granularity]');
-let trendChart = null; 
-let trendGranularity = 'day'; // Estado inicial: agrupar por día
-
-// Fecha
-const gastoFechaInput = document.getElementById('gasto-fecha');
-const editGastoFecha = document.getElementById('edit-gasto-fecha');
-
-// Paginación (NUEVO)
-const paginationControls = document.getElementById('pagination-controls');
-const PAGE_SIZE = 10; // Número fijo de gastos por página
-let currentPage = 1; // Página actual
-let totalPages = 1; // Total de páginas disponibles
-
-// Edición Modal (Fase 4)
-const editGastoModalElement = document.getElementById('editGastoModal');
-const editGastoModal = new bootstrap.Modal(editGastoModalElement);
-const editGastoForm = document.getElementById('edit-gasto-form');
-const editGastoId = document.getElementById('edit-gasto-id');
-const editGastoMonto = document.getElementById('edit-gasto-monto');
-const editGastoDescripcion = document.getElementById('edit-gasto-descripcion');
-const editGastoCategoria = document.getElementById('edit-gasto-categoria');
-
-// Confirmación de Eliminación (UX)
-const deleteConfirmModalElement = document.getElementById('deleteConfirmModal');
-const deleteConfirmModal = new bootstrap.Modal(deleteConfirmModalElement);
-const confirmDeleteId = document.getElementById('confirm-delete-id');
-const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-
-// Modal de Éxito (UX)
-const successModalElement = document.getElementById('successModal');
-const successModal = new bootstrap.Modal(successModalElement);
-const successMessage = document.getElementById('success-message');
-
-// Variables de Estado
-let isSignInMode = true;
-
-// ----------------------------------------------
-// FUNCIONES HELPER (Manejo de Errores y Carga)
-// ----------------------------------------------
-
-const appAlertsContainer = document.createElement('div');
-appAlertsContainer.className = 'my-3';
-appAlertsContainer.id = 'app-alerts';
-appContainer.prepend(appAlertsContainer); 
-
-/**
- * Muestra una alerta con Bootstrap en la vista principal y la oculta automáticamente.
- */
-function showAppAlert(message, type = 'danger') {
-    const alertHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-    appAlertsContainer.innerHTML = alertHTML;
-    
-    setTimeout(() => {
-        const currentAlert = appAlertsContainer.querySelector('.alert');
-        if (currentAlert) {
-            new bootstrap.Alert(currentAlert).close();
-        }
-    }, 5000);
-}
-
-/**
- * Alterna el estado de carga y el spinner de un botón.
- */
-function toggleLoading(buttonElement, isLoading, originalText) {
-    if (isLoading) {
-        buttonElement.dataset.originalText = buttonElement.textContent;
-        buttonElement.disabled = true;
-        buttonElement.innerHTML = `
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            Cargando...
-        `;
-    } else {
-        buttonElement.disabled = false;
-        buttonElement.textContent = originalText || buttonElement.dataset.originalText;
-        delete buttonElement.dataset.originalText;
-    }
-}
-
+// Gráficos
+let categoryChart = null;
+let trendChart = null;
 
 // ==============================================
-// FASE 2: Lógica de Autenticación
+// 2. UTILIDADES DE NOTIFICACIÓN (SweetAlert2)
 // ==============================================
+
+/**
+ * Reemplazo de alertas tradicionales por Toasts elegantes
+ */
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true
+});
+
+function notify(title, icon = 'success') {
+    Toast.fire({ icon, title });
+}
+
+function showAlert(title, text, icon = 'error') {
+    Swal.fire({ title, text, icon, confirmButtonColor: '#0d6efd' });
+}
+
+// ==============================================
+// 3. AUTENTICACIÓN
+// ==============================================
+
+async function checkUser() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    toggleUI(!!user);
+}
 
 function toggleUI(loggedIn) {
     if (loggedIn) {
         authContainer.classList.add('d-none');
         appContainer.classList.remove('d-none');
+        obtenerGastos();
         setupRealtime();
-        // Inicializa el botón de tendencia y llama a obtenerGastos con el filtro/ordenamiento actual
-        document.getElementById('trend-day').classList.add('btn-info');
-        // Aseguramos que la página se restablezca a 1 al cargar
-        currentPage = 1; 
-        obtenerGastos(filterCategoria.value); 
     } else {
         authContainer.classList.remove('d-none');
         appContainer.classList.add('d-none');
-        gastosList.innerHTML = '<tr><td colspan="5" class="text-center">No has iniciado sesión.</td></tr>';
     }
 }
 
-async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    toggleUI(!!user);
-}
-
-authForm.onsubmit = async (e) => {
+document.getElementById('auth-form').onsubmit = async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    let authResponse;
+    const isSignIn = document.getElementById('auth-title').textContent === 'Iniciar Sesión';
 
-    alertAuth.classList.add('d-none');
-    alertAuth.classList.remove('alert-success', 'alert-danger');
-    
-    toggleLoading(authButton, true, isSignInMode ? 'Entrar' : 'Registrarme');
+    const { data, error } = isSignIn 
+        ? await supabaseClient.auth.signInWithPassword({ email, password })
+        : await supabaseClient.auth.signUp({ email, password });
 
-    if (isSignInMode) {
-        authResponse = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+        showAlert('Error de Autenticación', error.message);
     } else {
-        authResponse = await supabase.auth.signUp({ email, password });
-    }
-    
-    toggleLoading(authButton, false, isSignInMode ? 'Entrar' : 'Registrarme');
-
-    if (authResponse.error) {
-        alertAuth.textContent = `Error: ${authResponse.error.message}`;
-        alertAuth.classList.remove('d-none');
-        alertAuth.classList.add('alert-danger');
-    } else if (authResponse.data.user) {
-        toggleUI(true);
-    } else if (!isSignInMode) {
-        alertAuth.textContent = 'Registro exitoso. Revisa tu email para confirmar la cuenta.';
-        alertAuth.classList.remove('d-none');
-        alertAuth.classList.add('alert-success');
-        toggleAuthLink.click(); 
+        if (isSignIn) notify('¡Bienvenido!');
+        else showAlert('Éxito', 'Registro completado. Verifica tu email.', 'success');
+        checkUser();
     }
 };
 
-toggleAuthLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    isSignInMode = !isSignInMode; 
-
-    if (isSignInMode) {
-        authTitle.textContent = 'Iniciar Sesión';
-        authButton.textContent = 'Entrar';
-        toggleAuthLink.textContent = '¿No tienes cuenta? Regístrate';
-    } else {
-        authTitle.textContent = 'Registrar Cuenta';
-        authButton.textContent = 'Registrarme';
-        toggleAuthLink.textContent = '¿Ya tienes cuenta? Inicia Sesión';
-    }
-    alertAuth.classList.add('d-none');
-    alertAuth.classList.remove('alert-success', 'alert-danger');
-});
-
-signoutButton.onclick = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-        toggleUI(false);
-    } else {
-        showAppAlert(`Error al cerrar sesión: ${error.message}`, 'danger');
-    }
+document.getElementById('signout-button').onclick = async () => {
+    await supabaseClient.auth.signOut();
+    toggleUI(false);
 };
-
-checkUser();
-
 
 // ==============================================
-// FASES 3, 4, 5: CRUD, Totales, Filtrado y Gráficos
+// 4. LÓGICA DE DATOS (CRUD)
 // ==============================================
 
 /**
- * FASE 3/UX: Obtiene, calcula el total, filtra, ordena, pagina y renderiza la lista de gastos.
- * * ⚠️ CORRECCIÓN CLAVE: Se separa la consulta en dos: una para el Análisis (todos los gastos)
- * y otra para la Visualización (gastos de la página actual).
+ * Función principal para traer datos y actualizar la vista
  */
-async function obtenerGastos(categoriaFilter = 'ALL') {
-    gastosList.innerHTML = '<tr><td colspan="5" class="text-center">Cargando gastos...</td></tr>';
-    totalGastosElement.textContent = 'S/0.00'; 
+async function obtenerGastos() {
+    const filter = document.getElementById('filter-categoria').value;
     
-    // --- QUERY 1: Obtener TODOS los datos necesarios para ANÁLISIS, Totales y Conteo ---
-    let analysisQuery = supabase
-        .from('gastos')
-        // Solo necesitamos estos campos para Charts y Totales. Pedimos el conteo total.
-        .select('monto, descripcion, categoria, gasto_fecha', { count: 'exact' }); 
-        
-    // LÓGICA DE FILTRADO (debe aplicarse a ambas consultas)
-    if (categoriaFilter !== 'ALL') {
-        analysisQuery = analysisQuery.eq('categoria', categoriaFilter);
-    }
+    // 1. Obtener totales para gráficos y sumatoria
+    let queryTotales = supabaseClient.from('gastos').select('monto, categoria, gasto_fecha', { count: 'exact' });
+    if (filter !== 'ALL') queryTotales = queryTotales.eq('categoria', filter);
     
-    // Ejecutar la consulta de análisis (sin paginación)
-    const { data: allGastosForAnalysis, error: analysisError, count: totalCount } = await analysisQuery;
+    const { data: allData, count } = await queryTotales;
+    if (!allData) return;
 
-    if (analysisError) {
-        console.error("Error al cargar datos de análisis:", analysisError.message);
-        gastosList.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${analysisError.message}</td></tr>`;
-        return;
-    }
-    
-    // 1. CÁLCULO DE PÁGINAS y TOTALES (Usando el conteo total)
-    const totalItems = totalCount || 0;
-    totalPages = Math.ceil(totalItems / PAGE_SIZE);
-    
-    // Si la página actual excede el nuevo total de páginas, vamos a la última página válida
-    if (currentPage > totalPages && totalPages > 0) {
-        currentPage = totalPages;
-    }
-    
-    // CÁLCULO DEL TOTAL (Usando TODOS los gastos)
-    const totalMonto = allGastosForAnalysis.reduce((sum, gasto) => sum + parseFloat(gasto.monto), 0);
-    totalGastosElement.textContent = `S/ ${totalMonto.toFixed(2)}`;
+    // Actualizar sumatoria y gráficos
+    const total = allData.reduce((acc, g) => acc + parseFloat(g.monto), 0);
+    totalGastosElement.textContent = `S/ ${total.toFixed(2)}`;
+    renderCharts(allData);
 
-    // RENDERIZADO DE GRÁFICOS (Usando TODOS los gastos)
-    renderChart(allGastosForAnalysis);
-    renderTrendChart(allGastosForAnalysis, trendGranularity);
-    renderPaginationControls(); // Actualiza los controles antes de dibujar la tabla
+    // 2. Obtener datos paginados para la tabla
+    totalPages = Math.ceil(count / PAGE_SIZE);
+    const from = (currentPage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-
-    // --- QUERY 2: Obtener los datos para la TABLA (con Paginación) ---
-    const offset = (currentPage - 1) * PAGE_SIZE;
-    const limit = PAGE_SIZE - 1; // Supabase es inclusivo (ej: 0 a 9)
+    let queryTable = supabaseClient.from('gastos').select('*').range(from, to)
+        .order(currentSortColumn, { ascending: currentSortOrder === 'asc' });
     
-    let displayQuery = supabase
-        .from('gastos')
-        // Seleccionamos todos los campos necesarios para la tabla
-        .select('monto, descripcion, categoria, gasto_fecha, id'); 
-    
-    // LÓGICA DE FILTRADO (debe aplicarse)
-    if (categoriaFilter !== 'ALL') {
-        displayQuery = displayQuery.eq('categoria', categoriaFilter);
-    }
-    
-    // LÓGICA DE ORDENAMIENTO (debe aplicarse)
-    const isAscending = currentSortOrder === 'asc';
-    displayQuery = displayQuery.order(currentSortColumn, { ascending: isAscending });
+    if (filter !== 'ALL') queryTable = queryTable.eq('categoria', filter);
 
-    // LÓGICA DE PAGINACIÓN: Aplicar el rango
-    displayQuery = displayQuery.range(offset, offset + limit);
-
-    const { data: gastosForDisplay, error: displayError } = await displayQuery;
-
-    if (displayError) {
-        console.error("Error al cargar gastos para mostrar:", displayError.message);
-        gastosList.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error al cargar la tabla: ${displayError.message}</td></tr>`;
-        return;
-    }
-    
-    // RENDERIZADO DE LA TABLA
-    renderGastos(gastosForDisplay);
-    updateSortIndicators();
+    const { data: pageData } = await queryTable;
+    renderTable(pageData);
+    renderPagination();
 }
 
-function renderGastos(gastos) {
+/**
+ * Crea la tabla dinámicamente
+ */
+function renderTable(gastos) {
     gastosList.innerHTML = '';
-    if (gastos.length === 0) {
-        gastosList.innerHTML = '<tr><td colspan="5" class="text-center">No tienes gastos registrados.</td></tr>';
+    if (!gastos || gastos.length === 0) {
+        gastosList.innerHTML = '<tr><td colspan="5" class="text-center">No hay registros</td></tr>';
         return;
     }
 
-    gastos.forEach(gasto => {
+    gastos.forEach(g => {
         const row = gastosList.insertRow();
-        row.dataset.id = gasto.id;
-
-        const formattedMonto = `S/${parseFloat(gasto.monto).toFixed(2)}`;
-        
-        // SOLUCIÓN DE ZONA HORARIA: Agregamos 'T00:00:00' para evitar que JS retroceda la fecha un día.
-        const formattedDate = new Date(gasto.gasto_fecha + 'T00:00:00').toLocaleDateString('es-ES');
-
-        row.insertCell(0).textContent = formattedMonto;
-        row.insertCell(1).textContent = gasto.descripcion;
-        row.insertCell(2).textContent = gasto.categoria;
-        row.insertCell(3).textContent = formattedDate; // La columna 3 es la fecha
-
-        const actionsCell = row.insertCell(4);
-        actionsCell.innerHTML = `
-            <button class="btn btn-sm btn-info text-white me-2 edit-btn" data-id="${gasto.id}">Editar</button>
-            <button class="btn btn-sm btn-danger delete-btn" data-id="${gasto.id}">Eliminar</button>
+        row.innerHTML = `
+            <td>S/${parseFloat(g.monto).toFixed(2)}</td>
+            <td>${g.descripcion}</td>
+            <td><span class="badge bg-light text-dark">${g.categoria}</span></td>
+            <td>${new Date(g.gasto_fecha + 'T00:00:00').toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-info text-white" onclick="abrirModalEditar('${g.id}')">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="confirmarEliminar('${g.id}')">Eliminar</button>
+            </td>
         `;
     });
 }
 
-/**
- * UX: Dibuja los controles de paginación (botones).
- */
-function renderPaginationControls() {
-    paginationControls.innerHTML = '';
+// ==============================================
+// 5. MANEJO DE GASTOS (NUEVO, EDITAR, BORRAR)
+// ==============================================
+
+// AGREGAR
+document.getElementById('gasto-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const user = (await supabaseClient.auth.getUser()).data.user;
     
-    if (totalPages <= 1) return;
+    const nuevoGasto = {
+        user_id: user.id,
+        monto: parseFloat(document.getElementById('gasto-monto').value),
+        descripcion: document.getElementById('gasto-descripcion').value,
+        categoria: document.getElementById('gasto-categoria').value,
+        gasto_fecha: document.getElementById('gasto-fecha').value
+    };
 
-    // Botón Anterior
-    const prevLi = document.createElement('li');
-    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-    prevLi.innerHTML = `<a class="page-link" href="#" data-page="${currentPage - 1}">Anterior</a>`;
-    paginationControls.appendChild(prevLi);
-
-    // Botones de Página (mostrar un rango limitado)
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(totalPages, currentPage + 2);
-
-    for (let i = startPage; i <= endPage; i++) {
-        const li = document.createElement('li');
-        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
-        li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
-        paginationControls.appendChild(li);
+    const { error } = await supabaseClient.from('gastos').insert([nuevoGasto]);
+    if (error) showAlert('Error', error.message);
+    else {
+        notify('Gasto guardado correctamente');
+        e.target.reset();
+        obtenerGastos();
     }
-    
-    // Mostrar puntos suspensivos si es necesario
-    if (endPage < totalPages) {
-        const dotsLi = document.createElement('li');
-        dotsLi.className = 'page-item disabled';
-        dotsLi.innerHTML = `<span class="page-link">...</span>`;
-        paginationControls.appendChild(dotsLi);
+};
+
+// ELIMINAR (Con SweetAlert2)
+// ==============================================
+// MODIFICACIÓN EN ELIMINAR
+// ==============================================
+// ELIMINAR MEJORADO CON DIAGNÓSTICO
+async function confirmarEliminar(id) {
+    // 1. Verificamos por consola qué ID estamos intentando borrar
+    console.log("Intentando eliminar el gasto con ID:", id);
+
+    if (!id || id === 'undefined') {
+        showAlert('Error', 'El ID del gasto no es válido.');
+        return;
     }
-    
-    // Botón Siguiente
-    const nextLi = document.createElement('li');
-    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-    nextLi.innerHTML = `<a class="page-link" href="#" data-page="${currentPage + 1}">Siguiente</a>`;
-    paginationControls.appendChild(nextLi);
+
+    const result = await Swal.fire({
+        title: '¿Estás seguro?',
+        text: "Esta acción no se puede deshacer",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+        // 2. Añadimos .select() al final para forzar que Supabase nos diga si borró algo
+        const { data, error } = await supabaseClient
+            .from('gastos')
+            .delete()
+            .eq('id', id)
+            .select();
+
+        console.log("Respuesta de Supabase al eliminar:", { data, error });
+
+        if (error) {
+            showAlert('Error de base de datos', error.message);
+        } else if (data && data.length === 0) {
+            // Si data es un array vacío, significa que el comando se ejecutó pero NO se borró nada
+            showAlert(
+                'No se pudo eliminar', 
+                'No se encontró el registro o no tienes permisos (Revisa las políticas RLS de DELETE en Supabase).', 
+                'warning'
+            );
+        } else {
+            notify('Gasto eliminado correctamente');
+            await obtenerGastos(); // Actualizamos la tabla
+        }
+    }
 }
 
-
-/**
- * UX: Procesa los gastos y renderiza el gráfico de pastel por categoría.
- */
-function renderChart(gastos) {
-    const categoryTotals = gastos.reduce((acc, gasto) => {
-        const monto = parseFloat(gasto.monto);
-        if (acc[gasto.categoria]) {
-            acc[gasto.categoria] += monto;
-        } else {
-            acc[gasto.categoria] = monto;
-        }
-        return acc;
-    }, {});
-
-    const labels = Object.keys(categoryTotals);
-    const data = Object.values(categoryTotals);
-
-    const colors = {
-        'Alimentación': '#dc3545', // Rojo
-        'Transporte': '#0d6efd', // Azul
-        'Vivienda': '#ffc107', // Amarillo
-        'Entretenimiento': '#17a2b8', // Info (Cian)
-        'Otros': '#6c757d', // Gris
-    };
+// ==============================================
+// MODIFICACIÓN EN EDITAR
+// ==============================================
+async function abrirModalEditar(id) {
+    const { data: g } = await supabaseClient.from('gastos').select('*').eq('id', id).single();
     
-    const backgroundColors = labels.map(label => colors[label] || '#CCCCCC');
+    const { value: formValues } = await Swal.fire({
+        title: 'Editar Gasto',
+        html: `
+            <input id="swal-monto" type="number" class="swal2-input" placeholder="Monto" value="${g.monto}">
+            <input id="swal-desc" type="text" class="swal2-input" placeholder="Descripción" value="${g.descripcion}">
+            <select id="swal-cat" class="swal2-input">
+                <option value="Alimentación" ${g.categoria === 'Alimentación' ? 'selected' : ''}>Alimentación</option>
+                <option value="Transporte" ${g.categoria === 'Transporte' ? 'selected' : ''}>Transporte</option>
+                <option value="Vivienda" ${g.categoria === 'Vivienda' ? 'selected' : ''}>Alquiler</option>
+                <option value="Entretenimiento" ${g.categoria === 'Entretenimiento' ? 'selected' : ''}>Entretenimiento</option>
+                <option value="Otros" ${g.categoria === 'Otros' ? 'selected' : ''}>Otros</option>
+            </select>
+            <input id="swal-fecha" type="date" class="swal2-input" value="${g.gasto_fecha}">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar Cambios',
+        preConfirm: () => {
+            return {
+                monto: document.getElementById('swal-monto').value,
+                descripcion: document.getElementById('swal-desc').value,
+                categoria: document.getElementById('swal-cat').value,
+                gasto_fecha: document.getElementById('swal-fecha').value
+            }
+        }
+    });
 
+    if (formValues) {
+        const { error } = await supabaseClient.from('gastos').update(formValues).eq('id', id);
+        
+        if (error) {
+            showAlert('Error', error.message);
+        } else {
+            notify('Actualizado correctamente');
+            // AGREGAMOS ESTO: Refresco manual inmediato
+            await obtenerGastos(); 
+        }
+    }
+}
+
+// EDITAR (Usando SweetAlert2 como formulario dinámico)
+async function abrirModalEditar(id) {
+    // 1. Obtener datos actuales
+    const { data: g } = await supabaseClient.from('gastos').select('*').eq('id', id).single();
+    
+    // 2. Mostrar SweetAlert con HTML inyectado
+    const { value: formValues } = await Swal.fire({
+        title: 'Editar Gasto',
+        html: `
+            <input id="swal-monto" type="number" class="swal2-input" placeholder="Monto" value="${g.monto}">
+            <input id="swal-desc" type="text" class="swal2-input" placeholder="Descripción" value="${g.descripcion}">
+            <select id="swal-cat" class="swal2-input">
+                <option value="Alimentación" ${g.categoria === 'Alimentación' ? 'selected' : ''}>Alimentación</option>
+                <option value="Transporte" ${g.categoria === 'Transporte' ? 'selected' : ''}>Transporte</option>
+                <option value="Vivienda" ${g.categoria === 'Vivienda' ? 'selected' : ''}>Alquiler</option>
+                <option value="Entretenimiento" ${g.categoria === 'Entretenimiento' ? 'selected' : ''}>Entretenimiento</option>
+                <option value="Otros" ${g.categoria === 'Otros' ? 'selected' : ''}>Otros</option>
+            </select>
+            <input id="swal-fecha" type="date" class="swal2-input" value="${g.gasto_fecha}">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar Cambios',
+        preConfirm: () => {
+            return {
+                monto: document.getElementById('swal-monto').value,
+                descripcion: document.getElementById('swal-desc').value,
+                categoria: document.getElementById('swal-cat').value,
+                gasto_fecha: document.getElementById('swal-fecha').value
+            }
+        }
+    });
+
+    if (formValues) {
+        const { error } = await supabaseClient.from('gastos').update(formValues).eq('id', id);
+        if (error) showAlert('Error', error.message);
+        else notify('Actualizado correctamente');
+    }
+}
+
+// ==============================================
+// 6. FUNCIONES DE APOYO (Gráficos, Paginación, etc.)
+// ==============================================
+
+// ==============================================
+// LÓGICA DE GRÁFICOS (CHART.JS)
+// ==============================================
+
+function renderCharts(data) {
+    // Si no hay datos, limpiamos los gráficos y salimos
+    if (!data || data.length === 0) {
+        if (categoryChart) categoryChart.destroy();
+        if (trendChart) trendChart.destroy();
+        return;
+    }
+
+    renderCategoryChart(data);
+    renderTrendChart(data);
+}
+
+function renderCategoryChart(data) {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+
+    // 1. Agrupar totales por categoría
+    const totalesPorCategoria = {};
+    data.forEach(gasto => {
+        const cat = gasto.categoria || 'Otros';
+        totalesPorCategoria[cat] = (totalesPorCategoria[cat] || 0) + parseFloat(gasto.monto);
+    });
+
+    const labels = Object.keys(totalesPorCategoria);
+    const values = Object.values(totalesPorCategoria);
+
+    // 2. Destruir gráfico anterior si existe para evitar solapamientos
     if (categoryChart) {
         categoryChart.destroy();
     }
 
-    categoryChart = new Chart(categoryChartCanvas, {
-        type: 'doughnut', 
+    // 3. Crear el nuevo gráfico de tipo "Doughnut" (Dona)
+    categoryChart = new Chart(ctx, {
+        type: 'doughnut',
         data: {
             labels: labels,
             datasets: [{
-                data: data,
-                backgroundColor: backgroundColors,
-                hoverOffset: 4
+                data: values,
+                backgroundColor: [
+                    '#0d6efd', // Primary
+                    '#198754', // Success
+                    '#ffc107', // Warning
+                    '#dc3545', // Danger
+                    '#0dcaf0', // Info
+                    '#6c757d'  // Secondary
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: false, // Permite que se adapte al contenedor
             plugins: {
                 legend: { position: 'bottom' },
-                title: {
-                    display: true,
-                    text: 'Distribución Porcentual del Gasto',
-                    font: { size: 14 }
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` S/ ${context.parsed.toFixed(2)}`;
+                        }
+                    }
                 }
             }
         }
     });
 }
 
-/**
- * UX: Procesa los gastos y renderiza el gráfico de línea de tendencia.
- */
-function renderTrendChart(gastos, granularity) {
+function renderTrendChart(data) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+
+    // 1. Agrupar datos según la granularidad seleccionada (día, mes, año)
+    const agrupado = {};
+    data.forEach(gasto => {
+        let key = gasto.gasto_fecha; // Por defecto: 'YYYY-MM-DD'
+        
+        if (trendGranularity === 'mes') {
+            key = key.substring(0, 7); // Extrae 'YYYY-MM'
+        } else if (trendGranularity === 'año') {
+            key = key.substring(0, 4); // Extrae 'YYYY'
+        }
+
+        agrupado[key] = (agrupado[key] || 0) + parseFloat(gasto.monto);
+    });
+
+    // 2. Ordenar las fechas cronológicamente
+    const labels = Object.keys(agrupado).sort();
+    const values = labels.map(label => agrupado[label]);
+
+    // 3. Destruir gráfico anterior
     if (trendChart) {
         trendChart.destroy();
     }
-    
-    // Función helper para formatear la fecha según la granularidad
-    const formatLabel = (date) => {
-        // SOLUCIÓN DE ZONA HORARIA: Forzar la medianoche local para evitar desfases
-        const d = new Date(date + 'T00:00:00'); 
-        
-        switch (granularity) {
-            case 'año':
-                return d.getFullYear();
-            case 'mes':
-                // Nota: Usamos ISO (YYYY-MM) para asegurar el ordenamiento correcto en el switch:
-                return d.toISOString().substring(0, 7); 
-            case 'dia':
-            default:
-                // Nota: Usamos ISO (YYYY-MM-DD) para asegurar el ordenamiento correcto en el switch:
-                return date; // Ya viene como YYYY-MM-DD
-        }
-    };
-    
-    // 1. Agrupar montos por la clave de tiempo (usando gasto_fecha)
-    const trendData = gastos.reduce((acc, gasto) => {
-        const monto = parseFloat(gasto.monto);
-        const dateKey = formatLabel(gasto.gasto_fecha); 
-        
-        if (acc[dateKey]) {
-            acc[dateKey] += monto;
-        } else {
-            acc[dateKey] = monto;
-        }
-        return acc;
-    }, {});
 
-    // 2. ORDENAMIENTO CRONOLÓGICO:
-    // Ahora las claves son YYYY-MM-DD o YYYY-MM, que se ordenan correctamente como texto (alfabéticamente).
-    const sortedLabels = Object.keys(trendData).sort();
-    const data = sortedLabels.map(label => trendData[label]);
-    
-    // 3. Formatear las etiquetas para visualización si es necesario (solo si se agrupa por mes)
-    const labels = sortedLabels.map(label => {
-        if (granularity === 'month') {
-             // Convertimos de YYYY-MM a "Dic. 2025" para la visualización final
-             const [year, month] = label.split('-');
-             const d = new Date(year, month - 1); // mes - 1 porque JS es base 0
-             return d.toLocaleString('es-ES', { year: 'numeric', month: 'short' });
-        }
-        return label; // Días ya están bien (YYYY-MM-DD)
-    });
-
-    // 4. Crear el gráfico de línea
-    trendChart = new Chart(trendChartCanvas, {
-        type: 'line',
+    // 4. Crear el nuevo gráfico (Gráfico de barras)
+    trendChart = new Chart(ctx, {
+        type: 'bar', // Puedes cambiar a 'line' si prefieres líneas
         data: {
             labels: labels,
             datasets: [{
-                label: 'Gasto Total',
-                data: data,
-                borderColor: '#17a2b8', 
-                backgroundColor: 'rgba(23, 162, 184, 0.1)',
-                fill: true,
-                tension: 0.2
+                label: 'Total Gastado (S/)',
+                data: values,
+                backgroundColor: 'rgba(25, 135, 84, 0.6)', // Verde translúcido
+                borderColor: '#198754', // Verde oscuro
+                borderWidth: 1,
+                borderRadius: 4 // Bordes redondeados en las barras
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: {
+                y: { 
                     beginAtZero: true,
-                    title: { display: true, text: 'Monto (S/)' }
+                    ticks: { callback: value => 'S/ ' + value }
                 }
             },
             plugins: {
-                legend: { display: false },
-                title: {
-                    display: true,
-                    text: `Gasto Agrupado por ${granularity.toUpperCase()}`,
-                    font: { size: 12 }
-                }
+                legend: { display: false } // Ocultamos la leyenda por ser solo un set de datos
             }
         }
     });
 }
+function renderPagination() {
+    const nav = document.getElementById('pagination-controls');
+    nav.innerHTML = '';
+    if (totalPages <= 1) return;
 
-
-/**
- * FASE 3/UX: Agrega un nuevo gasto.
- */
-gastoForm.onsubmit = async (e) => {
-    e.preventDefault();
-    
-    gastoForm.classList.add('was-validated');
-    if (!gastoForm.checkValidity()) {
-        showAppAlert('Por favor, rellena todos los campos de forma válida.', 'warning');
-        return;
-    }
-    
-    const user = (await supabase.auth.getUser()).data.user;
-    const montoInput = document.getElementById('gasto-monto');
-    const descripcionInput = document.getElementById('gasto-descripcion');
-    const categoriaInput = document.getElementById('gasto-categoria');
-    const gastoFecha = gastoFechaInput.value; 
-
-    const nuevoGasto = {
-        user_id: user.id,
-        monto: parseFloat(montoInput.value),
-        descripcion: descripcionInput.value,
-        categoria: categoriaInput.value,
-        gasto_fecha: gastoFecha, 
-    };
-
-    toggleLoading(gastoSubmitButton, true, 'Guardar Gasto');
-
-    const { error } = await supabase
-        .from('gastos')
-        .insert([nuevoGasto]);
-
-    toggleLoading(gastoSubmitButton, false, 'Guardar Gasto');
-
-    if (error) {
-        showAppAlert(`Error al agregar gasto: ${error.message}. Verifica tus permisos (RLS).`, 'danger');
-    } else {
-        successMessage.textContent = `Monto: S/${nuevoGasto.monto.toFixed(2)} - Categoría: ${nuevoGasto.categoria} (Fecha: ${new Date(gastoFecha + 'T00:00:00').toLocaleDateString('es-ES')})`;
-        successModal.show();
-        
-        gastoForm.reset();
-        gastoForm.classList.remove('was-validated');
-    }
-};
-
-/**
- * FASE 4/UX: Delega la eliminación y abre el modal de edición.
- */
-gastosList.onclick = async (e) => {
-    const target = e.target;
-    const gastoId = target.dataset.id;
-    
-    if (!gastoId) return;
-
-    if (target.classList.contains('delete-btn')) {
-        deleteConfirmModal.show();
-        confirmDeleteId.value = gastoId;
-        
-    } else if (target.classList.contains('edit-btn')) {
-        target.disabled = true; 
-        
-        const { data: gasto, error } = await supabase
-            .from('gastos')
-            .select('*')
-            .eq('id', gastoId)
-            .single();
-
-        target.disabled = false; 
-
-        if (error || !gasto) {
-            console.error("Error al obtener gasto para edición:", error?.message);
-            showAppAlert(`No se pudo cargar el gasto: ${error?.message}`, 'danger');
-            return;
-        }
-
-        editGastoId.value = gasto.id;
-        editGastoMonto.value = gasto.monto;
-        editGastoDescripcion.value = gasto.descripcion;
-        editGastoCategoria.value = gasto.categoria;
-        editGastoFecha.value = gasto.gasto_fecha; // Carga la fecha sin desfase
-
-        editGastoModal.show();
-    }
-};
-
-/**
- * FASE 4/UX: Lógica de eliminación tras confirmación del modal.
- */
-confirmDeleteBtn.onclick = () => {
-    const idToDelete = confirmDeleteId.value;
-    if (idToDelete) {
-        eliminarGasto(idToDelete);
-    }
-    deleteConfirmModal.hide();
-};
-
-async function eliminarGasto(id) {
-    const { error } = await supabase
-        .from('gastos')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-        showAppAlert(`Error al eliminar gasto: ${error.message}`, 'danger');
-    } else {
-        showAppAlert('Gasto eliminado exitosamente.', 'success');
+    for (let i = 1; i <= totalPages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="cambiarPagina(${i})">${i}</a>`;
+        nav.appendChild(li);
     }
 }
 
-/**
- * FASE 4/UX: Actualiza un gasto desde el modal.
- */
-editGastoForm.onsubmit = async (e) => {
-    e.preventDefault();
-    
-    const id = editGastoId.value;
-    const saveButton = editGastoModalElement.querySelector('button[type="submit"]');
-
-    const updates = {
-        monto: parseFloat(editGastoMonto.value),
-        descripcion: editGastoDescripcion.value,
-        categoria: editGastoCategoria.value,
-        gasto_fecha: editGastoFecha.value,
-    };
-    
-    toggleLoading(saveButton, true, 'Guardar Cambios');
-
-    const { error } = await supabase
-        .from('gastos')
-        .update(updates)
-        .eq('id', id);
-
-    toggleLoading(saveButton, false, 'Guardar Cambios');
-
-    if (error) {
-        showAppAlert(`Error al actualizar gasto: ${error.message}`, 'danger');
-    } else {
-        editGastoModal.hide(); 
-        showAppAlert('Gasto actualizado exitosamente.', 'success');
-    }
+window.cambiarPagina = (p) => {
+    currentPage = p;
+    obtenerGastos();
 };
-
-/**
- * UX: Actualiza las flechas indicadoras de orden en los encabezados.
- */
-function updateSortIndicators() {
-    document.querySelectorAll('.sortable span').forEach(span => {
-        span.textContent = '';
-    });
-
-    const indicator = document.getElementById(`sort-${currentSortColumn}`);
-    if (indicator) {
-        indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
-    }
-}
-
-/**
- * UX: Listener para hacer clic en los encabezados de la tabla.
- */
-document.querySelector('#app-container table thead').addEventListener('click', (e) => {
-    const header = e.target.closest('.sortable');
-    if (!header) return;
-
-    const newSortColumn = header.dataset.sort;
-
-    if (newSortColumn === currentSortColumn) {
-        currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
-        currentSortColumn = newSortColumn;
-        currentSortOrder = 'desc'; 
-    }
-    
-    // Al ordenar, volvemos a la página 1
-    currentPage = 1;
-    obtenerGastos(filterCategoria.value);
-});
-
-
-/**
- * FASE 5: Event Listener para el filtro de categoría.
- */
-filterCategoria.addEventListener('change', () => {
-    const selectedCategory = filterCategoria.value;
-    // Al filtrar, volvemos a la página 1
-    currentPage = 1;
-    obtenerGastos(selectedCategory);
-});
-
-/**
- * UX: Listener para cambiar la granularidad del gráfico de tendencia.
- */
-trendButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        trendButtons.forEach(btn => btn.classList.remove('active', 'btn-info'));
-        
-        button.classList.add('active', 'btn-info');
-        
-        trendGranularity = button.dataset.granularity;
-        obtenerGastos(filterCategoria.value);
-    });
-});
-
-/**
- * UX: Listener para cambiar la página al hacer clic en los botones.
- */
-paginationControls.addEventListener('click', (e) => {
-    e.preventDefault();
-    const target = e.target.closest('.page-link');
-    if (!target) return;
-    
-    const newPage = parseInt(target.dataset.page);
-    
-    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
-        currentPage = newPage;
-        // Recargar la lista con la nueva página
-        obtenerGastos(filterCategoria.value); 
-    }
-});
-
-
-// ==============================================
-// FASE 5: Realtime 
-// ==============================================
 
 function setupRealtime() {
-    supabase
-        .channel('gastos_channel')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, (payload) => {
-            console.log(`Cambio Realtime (${payload.eventType}) detectado. Recargando lista...`);
-            // Al detectar un cambio, aseguramos que la página se mantenga o salte si es necesario
-            obtenerGastos(filterCategoria.value); 
-        })
-        .subscribe();
+    supabaseClient.channel('custom-all-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, () => {
+        obtenerGastos();
+    }).subscribe();
 }
+
+// ==============================================
+// EVENTOS DE LOS BOTONES DEL GRÁFICO DE TENDENCIA
+// ==============================================
+document.querySelectorAll('[data-granularity]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        // 1. Quitar el color activo de todos los botones
+        document.querySelectorAll('[data-granularity]').forEach(b => {
+            b.classList.replace('btn-primary', 'btn-light');
+            b.classList.replace('text-white', 'text-dark');
+        });
+        
+        // 2. Poner el color activo al botón que clickeamos
+        e.target.classList.replace('btn-light', 'btn-primary');
+        e.target.classList.replace('text-dark', 'text-white');
+        
+        // 3. Cambiar la variable global y recargar datos
+        trendGranularity = e.target.getAttribute('data-granularity');
+        obtenerGastos(); 
+    });
+});
+
+// ==============================================
+// EVENTO DEL FILTRO POR CATEGORÍA
+// ==============================================
+const selectFiltroCategoria = document.getElementById('filter-categoria');
+
+if (selectFiltroCategoria) {
+    selectFiltroCategoria.addEventListener('change', () => {
+        // Es una buena práctica regresar a la página 1 cuando aplicamos un filtro nuevo
+        currentPage = 1; 
+        
+        // Llamamos a la función para que recargue todo inmediatamente
+        obtenerGastos(); 
+    });
+}
+
+// Inicializar
+checkUser();
