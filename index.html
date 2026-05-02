@@ -12,29 +12,29 @@
 <body>
 
     <div id="auth-container" class="container card-auth">
-        <div class="card shadow-lg border-0">
-            <div class="card-body p-4">
-                <h3 class="card-title text-center mb-4 text-primary" id="auth-title">Iniciar Sesión</h3>
-                <div id="alert-auth" class="alert alert-danger d-none" role="alert"></div>
-
-                <form id="auth-form">
-                    <div class="mb-3">
-                        <label for="email" class="form-label">📧 Email</label>
-                        <input type="email" class="form-control" id="email" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">🔒 Contraseña</label>
-                        <input type="password" class="form-control" id="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 mt-2" id="auth-button">Entrar</button>
-                </form>
-
-                <div class="text-center mt-3">
-                    <a href="#" id="toggle-auth">¿No tienes cuenta? Regístrate</a>
+    <div class="card shadow-lg border-0">
+        <div class="card-body p-4">
+            <h3 class="card-title text-center mb-4 text-primary" id="auth-title">Iniciar Sesión</h3>
+            
+            <form id="auth-form">
+                <div class="mb-3">
+                    <label for="email" class="form-label">📧 Email</label>
+                    <input type="email" class="form-control" id="email" required>
                 </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">🔒 Contraseña</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mt-2" id="auth-button">Entrar</button>
+            </form>
+
+            <div class="text-center mt-3">
+                <a href="#" id="toggle-auth" class="text-decoration-none d-block mb-2">¿No tienes cuenta? Regístrate</a>
+                <a href="#" id="forgot-password" class="text-muted small text-decoration-none">¿Olvidaste tu contraseña?</a>
             </div>
         </div>
     </div>
+</div>
 
     <div id="app-container" class="container app-container d-none">
         <header class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white rounded shadow-sm">

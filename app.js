@@ -30,6 +30,45 @@ let categoryChart = null;
 let trendChart = null;
 
 // ==============================================
+// FUNCIONES DE CONTROL DE ESTADO (UI)
+// ==============================================
+
+/**
+ * Verifica si hay una sesión activa y actualiza la interfaz
+ */
+async function checkUser() {
+    // IMPORTANTE: Usa el mismo nombre de cliente que definimos antes (supabaseClient)
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    
+    console.log("Usuario actual:", user); // Para depuración
+    toggleUI(!!user); // Envía 'true' si hay usuario, 'false' si no
+}
+
+/**
+ * Cambia la visibilidad entre el Login y el Dashboard
+ */
+function toggleUI(loggedIn) {
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+
+    if (loggedIn) {
+        authContainer.classList.add('d-none');
+        appContainer.classList.remove('d-none');
+        
+        // Si el usuario está dentro, cargamos sus datos
+        if (typeof obtenerGastos === 'function') {
+            obtenerGastos();
+        }
+        if (typeof setupRealtime === 'function') {
+            setupRealtime();
+        }
+    } else {
+        authContainer.classList.remove('d-none');
+        appContainer.classList.add('d-none');
+    }
+}
+
+// ==============================================
 // 2. UTILIDADES DE NOTIFICACIÓN (SweetAlert2)
 // ==============================================
 
@@ -53,49 +92,140 @@ function showAlert(title, text, icon = 'error') {
 }
 
 // ==============================================
-// 3. AUTENTICACIÓN
+// 3. AUTENTICACIÓN Y RECUPERACIÓN DE CONTRASEÑA
 // ==============================================
 
-async function checkUser() {
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    toggleUI(!!user);
+// Elementos del DOM
+const authTitle = document.getElementById('auth-title');
+const authButton = document.getElementById('auth-button');
+const toggleAuth = document.getElementById('toggle-auth');
+const forgotPassword = document.getElementById('forgot-password');
+
+// 1. Cambiar visualmente entre Iniciar Sesión y Registrarse
+if (toggleAuth) {
+    toggleAuth.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isLogin = authTitle.textContent === 'Iniciar Sesión';
+        
+        if (isLogin) {
+            authTitle.textContent = 'Registrarse';
+            authButton.textContent = 'Crear Cuenta';
+            authButton.classList.replace('btn-primary', 'btn-success');
+            toggleAuth.textContent = '¿Ya tienes cuenta? Inicia Sesión';
+        } else {
+            authTitle.textContent = 'Iniciar Sesión';
+            authButton.textContent = 'Entrar';
+            authButton.classList.replace('btn-success', 'btn-primary');
+            toggleAuth.textContent = '¿No tienes cuenta? Regístrate';
+        }
+    });
 }
 
-function toggleUI(loggedIn) {
-    if (loggedIn) {
-        authContainer.classList.add('d-none');
-        appContainer.classList.remove('d-none');
-        obtenerGastos();
-        setupRealtime();
-    } else {
-        authContainer.classList.remove('d-none');
-        appContainer.classList.add('d-none');
-    }
-}
-
+// 2. Lógica del formulario (Login / Registro)
 document.getElementById('auth-form').onsubmit = async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    const isSignIn = document.getElementById('auth-title').textContent === 'Iniciar Sesión';
+    const isSignIn = authTitle.textContent === 'Iniciar Sesión';
 
-    const { data, error } = isSignIn 
-        ? await supabaseClient.auth.signInWithPassword({ email, password })
-        : await supabaseClient.auth.signUp({ email, password });
-
-    if (error) {
-        showAlert('Error de Autenticación', error.message);
+    if (isSignIn) {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) showAlert('Error al entrar', error.message);
+        else { notify('¡Bienvenido!'); checkUser(); }
     } else {
-        if (isSignIn) notify('¡Bienvenido!');
-        else showAlert('Éxito', 'Registro completado. Verifica tu email.', 'success');
-        checkUser();
+        const { error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) showAlert('Error al registrar', error.message);
+        else {
+            Swal.fire('¡Registro exitoso!', 'Por favor, revisa tu correo electrónico para confirmar tu cuenta.', 'success');
+            // Regresamos el form a modo "Iniciar Sesión"
+            toggleAuth.click(); 
+        }
     }
 };
 
-document.getElementById('signout-button').onclick = async () => {
-    await supabaseClient.auth.signOut();
-    toggleUI(false);
-};
+// ==============================================
+// CERRAR SESIÓN
+// ==============================================
+const btnCerrarSesion = document.getElementById('signout-button');
+
+if (btnCerrarSesion) {
+    btnCerrarSesion.addEventListener('click', async () => {
+        // 1. Le decimos a Supabase que cierre la sesión en el servidor
+        const { error } = await supabaseClient.auth.signOut();
+        
+        if (error) {
+            showAlert('Error', 'No se pudo cerrar la sesión: ' + error.message);
+        } else {
+            // 2. Cambiamos la interfaz para mostrar el Login nuevamente
+            toggleUI(false);
+            
+            // 3. Limpiamos los datos visuales por seguridad (opcional pero recomendado)
+            document.getElementById('gastos-list').innerHTML = '';
+            document.getElementById('total-gastos').textContent = 'S/0.00';
+            if (categoryChart) categoryChart.destroy();
+            if (trendChart) trendChart.destroy();
+            
+            // 4. Mostramos una pequeña notificación
+            notify('Sesión cerrada correctamente', 'info');
+        }
+    });
+}
+
+// 3. Solicitar Recuperación de Contraseña
+if (forgotPassword) {
+    forgotPassword.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        const { value: email } = await Swal.fire({
+            title: 'Recuperar contraseña',
+            input: 'email',
+            inputLabel: 'Ingresa tu correo electrónico',
+            inputPlaceholder: 'ejemplo@correo.com',
+            showCancelButton: true,
+            confirmButtonText: 'Enviar enlace',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (email) {
+            // Enviamos el correo de reseteo (redirige a la app actual)
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + window.location.pathname
+            });
+
+            if (error) {
+                showAlert('Error', error.message);
+            } else {
+                Swal.fire('Revisa tu correo', 'Te hemos enviado un enlace mágico para restablecer tu contraseña.', 'success');
+            }
+        }
+    });
+}
+
+// 4. Escuchar cuando el usuario entra desde el enlace del correo
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+        // El usuario hizo clic en el enlace de su correo, pedimos la nueva contraseña
+        const { value: newPassword } = await Swal.fire({
+            title: 'Nueva Contraseña',
+            input: 'password',
+            inputLabel: 'Ingresa tu nueva contraseña (mínimo 6 caracteres)',
+            showCancelButton: false,
+            confirmButtonText: 'Actualizar Contraseña',
+            allowOutsideClick: false // Obligamos a que la cambie
+        });
+
+        if (newPassword) {
+            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+            
+            if (error) {
+                showAlert('Error', error.message);
+            } else {
+                Swal.fire('¡Éxito!', 'Tu contraseña ha sido actualizada.', 'success');
+                checkUser(); // Recargamos el dashboard
+            }
+        }
+    }
+});
 
 // ==============================================
 // 4. LÓGICA DE DATOS (CRUD)
