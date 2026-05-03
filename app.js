@@ -33,15 +33,27 @@ let trendChart = null;
 // FUNCIONES DE CONTROL DE ESTADO (UI)
 // ==============================================
 
-/**
- * Verifica si hay una sesión activa y actualiza la interfaz
- */
+// ==============================================
+// DETECTOR DE SESIÓN DINÁMICO
+// ==============================================
+
+// 1. Esta función debe ser capaz de leer la sesión actual
 async function checkUser() {
-    // IMPORTANTE: Usa el mismo nombre de cliente que definimos antes (supabaseClient)
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    // Obtenemos la sesión actual (esto captura el token de la URL automáticamente)
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
     
-    console.log("Usuario actual:", user); // Para depuración
-    toggleUI(!!user); // Envía 'true' si hay usuario, 'false' si no
+    if (error) {
+        console.error("Error al obtener sesión:", error);
+        toggleUI(false);
+        return;
+    }
+
+    if (session) {
+        console.log("Sesión activa encontrada para:", session.user.email);
+        toggleUI(true);
+    } else {
+        toggleUI(false);
+    }
 }
 
 /**
@@ -641,6 +653,25 @@ if (selectFiltroCategoria) {
         obtenerGastos(); 
     });
 }
+
+// 2. El "Escuchador" global (Ponerlo justo antes del final del archivo)
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    console.log("Evento Auth Detectado:", event);
+
+    // Si el evento es SIGNED_IN (que ocurre al confirmar email o loguearse)
+    // o INITIAL_SESSION (cuando recargas la página con un token activo)
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session) {
+            toggleUI(true);
+            // Si quieres, puedes limpiar la URL aburrida con el token
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+
+    if (event === 'SIGNED_OUT') {
+        toggleUI(false);
+    }
+});
 
 // Inicializar
 checkUser();
