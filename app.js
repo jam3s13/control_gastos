@@ -611,11 +611,32 @@ window.cambiarPagina = (p) => {
     obtenerGastos();
 };
 
-function setupRealtime() {
-    supabaseClient.channel('custom-all-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, () => {
-        obtenerGastos();
-    }).subscribe();
+// 1. Declara una variable global para el canal (ponla al inicio de tu app.js o fuera de la función)
+let realtimeChannel = null;
+
+async function setupRealtime() {
+    // 2. Si ya existe una conexión previa (ej. el usuario cerró sesión y volvió a entrar), la limpiamos
+    if (realtimeChannel) {
+        await supabaseClient.removeChannel(realtimeChannel);
+    }
+
+    // 3. Creamos el canal, agregamos el .on() y AL FINAL llamamos a .subscribe()
+    realtimeChannel = supabaseClient
+        .channel('custom-all-channel')
+        .on(
+            'postgres_changes', 
+            { event: '*', schema: 'public', table: 'gastos' }, 
+            (payload) => {
+                console.log('Cambio en la base de datos detectado:', payload);
+                // Aquí llamas a tu función para refrescar los datos
+                obtenerGastos(); 
+            }
+        )
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('Conectado a Supabase Realtime exitosamente');
+            }
+        });
 }
 
 // ==============================================
