@@ -1,24 +1,76 @@
+/* ==========================================
+   1. REINICIO GENERAL
+========================================== */
+body {
+    display: block !important;
+    background-color: var(--bs-body-bg);
+}
 
-        body { 
-            background-color: #e9ecef; /* Fondo más suave */
-        }
-        .card-auth { 
-            max-width: 400px; 
-            margin: 50px auto; 
-        }
-        .app-container { 
-            margin-top: 20px; 
-            margin-bottom: 40px;
-        }
-        .sidebar {
-            position: sticky; /* Fija la columna de análisis */
-            top: 20px;
-        }
-        .chart-container {
-            height: 280px; /* Altura fija para gráficos */
-        }
-        /* Estilo para hacer los encabezados de tabla clicables */
-        .sortable {
-            cursor: pointer; 
-            user-select: none;
-        }
+/* ==========================================
+   2. PANTALLA DE LOGIN
+========================================== */
+.card-auth {
+    max-width: 400px;
+    min-height: 100vh; /* Centrado vertical perfecto */
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ==========================================
+   3. ELEMENTOS GLOBALES
+========================================== */
+.chart-container {
+    height: 280px;
+    position: relative;
+}
+
+.sortable {
+    cursor: pointer;
+}
+
+/* ==========================================
+   4. LAYOUT DEL DASHBOARD (CONTENIDO)
+========================================== */
+.main-content {
+    background-color: var(--bs-body-bg);
+    min-height: 100vh; /* Permite que el contenido fluya hacia abajo naturalmente */
+}
+
+/* ==========================================
+   5. BARRA LATERAL (SOLO PC / ESCRITORIO)
+========================================== */
+/* En celulares, Bootstrap ya maneja el menú con la clase "offcanvas", 
+   así que solo aplicamos esto para pantallas grandes */
+@media (min-width: 992px) {
+    .sidebar {
+        width: 260px !important;
+        min-height: 100vh;
+        position: sticky;
+        top: 0;
+    }
+}
+
+/* ==========================================
+   6. ANIMACIONES DE VISTAS (PESTAÑAS)
+========================================== */
+.app-view {
+    display: none;
+}
+
+.app-view.active {
+    display: block;
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
