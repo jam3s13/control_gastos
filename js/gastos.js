@@ -2,7 +2,7 @@
  * js/gastos.js
  * Responsabilidad: Lógica de negocio (CRUD, paginación y tiempo real)
  */
-import { supabaseClient } from "./supabaseClient.js";
+import { supabaseClient } from "./supabaseclient.js";
 import { notify, showAlert } from "./ui.js";
 import { renderCharts } from "./charts.js";
 

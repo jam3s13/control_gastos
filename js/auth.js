@@ -2,7 +2,7 @@
  * js/auth.js
  * Responsabilidad: Manejo de usuarios, login, registro y sesiones.
  */
-import { supabaseClient } from './supabaseClient.js';
+import { supabaseClient } from './supabaseclient.js';
 import { notify, showAlert, toggleUI, renderUserProfile } from './ui.js'; // <- Agrega renderUserProfile aquí
 
 // Elementos del DOM
