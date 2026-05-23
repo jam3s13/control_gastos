@@ -2,7 +2,7 @@
  * js/main.js
  * Responsabilidad: Unir los módulos, iniciar la app e inyectar variables globales necesarias.
  */
-import { supabaseClient } from './supabaseClient.js';
+import { supabaseClient } from './supabaseClient.js'; // probando
 import { toggleUI, initDashboardUI } from './ui.js'; 
 import { checkUser, abrirPerfil } from './auth.js'; // <-- 1. Importas abrirPerfil aquí
 import { initChartControls } from './charts.js';
