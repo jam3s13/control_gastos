@@ -3,20 +3,14 @@
 ========================================== */
 body {
     display: block !important;
-    background-color: var(--bs-body-bg);
+    background: -webkit-linear-gradient(180deg,  #1d243a, #198754);
+    background: linear-gradient(180deg, #141722 , #198754);
 }
 
 /* ==========================================
    2. PANTALLA DE LOGIN
 ========================================== */
-.card-auth {
-    max-width: 400px;
-    min-height: 100vh; /* Centrado vertical perfecto */
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
+
 
 /* ==========================================
    3. ELEMENTOS GLOBALES
@@ -35,7 +29,8 @@ body {
 ========================================== */
 .main-content {
     background-color: var(--bs-body-bg);
-    min-height: 100vh; /* Permite que el contenido fluya hacia abajo naturalmente */
+    min-height: 100vh;
+    /* Permite que el contenido fluya hacia abajo naturalmente */
 }
 
 /* ==========================================
@@ -45,7 +40,7 @@ body {
    así que solo aplicamos esto para pantallas grandes */
 @media (min-width: 992px) {
     .sidebar {
-        width: 260px !important;
+        width: 300px !important;
         min-height: 100vh;
         position: sticky;
         top: 0;
@@ -69,8 +64,29 @@ body {
         opacity: 0;
         transform: translateY(15px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Estilo para los inputs en modo oscuro */
+.form-control {
+    background-color: rgb(212, 212, 212) !important;
+    color: #000000 !important;
+}
+
+.form-control:focus {
+    background-color: #a8a8a8 !important;
+    color: rgb(88, 88, 88)!important;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important;
+    /* Glow verde éxito */
+    border: 1px solid #198754 !important;
+}
+
+/* Ajuste para el label de los floating inputs */
+.form-floating>.form-control:focus~label,
+.form-floating>.form-control:not(:placeholder-shown)~label {
+    color: #198754 !important;
 }

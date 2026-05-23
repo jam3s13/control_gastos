@@ -9,32 +9,45 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-bootstrap-4/bootstrap-4.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 
 <body>
 
-    <div id="auth-container" class="container card-auth">
-        <div class="card shadow-lg border-0">
-            <div class="card-body p-4">
-                <h3 class="card-title text-center mb-4 text-primary" id="auth-title">Iniciar Sesión</h3>
+    <div id="auth-container" class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="card shadow-lg border-0 bg-dark text-light p-4 rounded-4" style="width: 100%; max-width: 400px;">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <i class="bi bi-wallet2 text-success" style="font-size: 3rem;"></i>
+                    <h3 class="card-title fw-bold mt-2" id="auth-title">Iniciar Sesión</h3>
+                    <p class="text-white-50 small">Gestiona tus finanzas con estilo</p>
+                </div>
 
                 <form id="auth-form">
-                    <div class="mb-3">
-                        <label for="email" class="form-label">📧 Email</label>
-                        <input type="email" class="form-control" id="email" required>
+                    <div class="form-floating mb-3">
+                        <input type="email" class="form-control bg-secondary text-white border-0" id="email"
+                            placeholder="nombre@ejemplo.com" required>
+                        <label for="email" class="text-white-50">Correo Electrónico</label>
                     </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">🔒 Contraseña</label>
-                        <input type="password" class="form-control" id="password" required>
+
+                    <div class="form-floating mb-3">
+                        <input type="password" class="form-control bg-secondary text-white border-0" id="password"
+                            placeholder="Contraseña" required>
+                        <label for="password" class="text-white-50">Contraseña</label>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 mt-2" id="auth-button">Entrar</button>
+
+                    <button type="submit" class="btn btn-success w-100 py-2 rounded-pill fw-bold mt-2" id="auth-button">
+                        Entrar
+                    </button>
                 </form>
 
-                <div class="text-center mt-3">
-                    <a href="#" id="toggle-auth" class="text-decoration-none d-block mb-2">¿No tienes cuenta?
-                        Regístrate</a>
-                    <a href="#" id="forgot-password" class="text-muted small text-decoration-none">¿Olvidaste tu
-                        contraseña?</a>
+                <div class="text-center mt-4">
+                    <a href="#" id="toggle-auth" class="text-success text-decoration-none d-block mb-2 fw-semibold">
+                        ¿No tienes cuenta? Regístrate
+                    </a>
+                    <a href="#" id="forgot-password" class="text-white-50 small text-decoration-none">
+                        ¿Olvidaste tu contraseña?
+                    </a>
                 </div>
             </div>
         </div>
@@ -46,7 +59,7 @@
 
             <div
                 class="d-lg-none bg-dark text-white p-3 d-flex justify-content-between align-items-center w-100 shadow-sm sticky-top">
-                <h5 class="mb-0 text-success fw-bold">💰 GestorApp</h5>
+                <h5 class="mb-0 text-success fw-bold">FinanzAPP</h5>
                 <button class="btn btn-outline-light border-0" type="button" data-bs-toggle="offcanvas"
                     data-bs-target="#sidebarMenu">
                     ☰ Menú
@@ -56,56 +69,89 @@
             <nav class="offcanvas-lg offcanvas-start bg-dark text-white sidebar shadow-lg" tabindex="-1"
                 id="sidebarMenu">
                 <div class="offcanvas-header border-bottom border-secondary d-lg-none">
-                    <h5 class="offcanvas-title text-success fw-bold">💰 GestorApp</h5>
+                    <h5 class="offcanvas-title text-success fw-bold">FinanzAPP</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
                         data-bs-target="#sidebarMenu"></button>
                 </div>
+
                 <div class="offcanvas-body d-flex flex-column p-3 h-100">
-                    <h4 class="text-center text-success mb-4 mt-2 fw-bold d-none d-lg-block">💰 GestorApp</h4>
+                    <h4 class="text-center text-success mb-4 mt-2 fw-bold d-none d-lg-block">FinanzAPP</h4>
 
                     <ul class="nav nav-pills flex-column mb-auto gap-2 w-100">
                         <li class="nav-item">
                             <a href="#" class="nav-link text-white active btn-view w-100" data-target="view-resumen"
-                                data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu">📊 Resumen</a>
+                                data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu">
+                                <i class="bi bi-bar-chart-fill me-2"></i> Resumen
+                            </a>
                         </li>
                         <li class="nav-item">
                             <a href="#" class="nav-link text-white btn-view w-100" data-target="view-movimientos"
-                                data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu">📋 Movimientos</a>
+                                data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu">
+                                <i class="bi bi-list-ul me-2"></i> Movimientos
+                            </a>
                         </li>
                     </ul>
 
+                    <div class="mt-auto d-flex flex-column gap-3 pb-2">
 
-                    <hr class="border-secondary w-100">
+                        <hr class="border-secondary w-100 m-0">
 
-                    <div class="form-check form-switch mb-3 ps-5">
-                        <input class="form-check-input" type="checkbox" id="theme-toggle" style="cursor: pointer;">
-                        <label class="form-check-label text-light" for="theme-toggle" style="cursor: pointer;">🌙 Modo
-                            Oscuro</label>
-                    </div>
-
-                    <div id="user-profile-box"
-                        class="d-flex align-items-center gap-3 mb-3 p-2 bg-secondary bg-opacity-25 rounded-3 d-none mt-auto">
-                        <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm"
-                            style="width: 40px; height: 40px; min-width: 40px;" id="user-avatar">
-                            U
+                        <!-- 1. Toggle de Modo Oscuro (Reubicado arriba del perfil y mejor alineado) -->
+                        <div class="d-flex justify-content-between align-items-center px-2">
+                            <label class="form-check-label text-light d-flex align-items-center" for="theme-toggle"
+                                style="cursor: pointer;">
+                                <i class="bi bi-moon-stars-fill me-2 text-white-50"></i> Modo Oscuro
+                            </label>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input m-0 shadow-none" type="checkbox" id="theme-toggle"
+                                    style="cursor: pointer;">
+                            </div>
                         </div>
-                        <div class="overflow-hidden">
-                            <p class="mb-0 text-muted fw-bold text-uppercase"
-                                style="font-size: 0.65rem; letter-spacing: 0.5px;">Usuario Activo</p>
-                            <p class="mb-0 small text-truncate fw-semibold text-white-50" id="user-email"
-                                style="max-width: 160px;"></p>
-                        </div>
-                    </div>
 
-                    <button id="signout-button" class="btn btn-outline-danger w-100 fw-bold">🚪 Cerrar Sesión</button>
+                        <!-- 2. Perfil de Usuario -->
+                        <div id="user-profile-box"
+                            class="d-flex align-items-center gap-3 p-2 bg-secondary bg-opacity-25 rounded-3 d-none">
+
+                            <!-- Avatar -->
+                            <img id="sidebar-avatar" src="" alt="Avatar"
+                                class="rounded-circle shadow-sm bg-light flex-shrink-0"
+                                style="width: 45px; height: 45px; object-fit: cover;">
+
+                            <!-- Información -->
+                            <div class="overflow-hidden flex-grow-1">
+                                <p class="mb-0 text-white fw-bold text-truncate" id="sidebar-name"
+                                    style="font-size: 0.9rem;">
+                                    Cargando...
+                                </p>
+                                <p class="mb-0 text-white-50 text-truncate" id="sidebar-email"
+                                    style="font-size: 0.75rem;">
+                                </p>
+                            </div>
+
+                            <!-- Ajustes -->
+                            <a href="#" class="text-white-50 p-2 rounded-3 hover-text-white transition flex-shrink-0"
+                                onclick="abrirPerfil()" aria-label="Abrir perfil">
+                                <i class="bi bi-gear fs-5"></i>
+                            </a>
+                        </div>
+
+                        <!-- 3. Botón de Cerrar Sesión (Ahora es el último elemento) -->
+                        <button id="signout-button"
+                            class="btn btn-outline-danger w-100 fw-bold d-flex align-items-center justify-content-center">
+                            <i class="bi bi-box-arrow-left me-2"></i> Cerrar Sesión
+                        </button>
+
+                    </div>
                 </div>
             </nav>
 
             <main class="main-content flex-grow-1 p-3 p-md-5 w-100">
 
                 <div
-                    class="d-flex flex-column flex-sm-row justify-content-end align-items-sm-center mb-4 pb-3 border-bottom gap-2">
-                    <div class="d-flex align-items-center gap-2 bg-body p-2 rounded shadow-sm border">
+                    class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-4 pb-3 border-bottom gap-3">
+                    <h2 id="dashboard-saludo" class="fw-bold m-0 d-none" style="font-size: 1.6rem;">
+                    </h2>
+                    <div class="d-flex align-items-center gap-2 bg-body p-2 rounded shadow-sm border mt-3 mt-sm-0">
                         <label for="global-month-filter" class="form-label text-primary fw-bold mb-0 text-nowrap"
                             style="font-size: 0.9rem;">
                             📅 Filtrar Mes:
@@ -117,6 +163,7 @@
                 </div>
 
                 <div id="view-resumen" class="app-view active">
+
                     <h2 class="mb-4 text-primary fw-bold">Resumen Financiero</h2>
 
                     <div class="row g-3 mb-4">
@@ -220,8 +267,8 @@
                                 </div>
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
-                                        <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
-                                            <thead class="table-light">
+                                        <table class="table table-hover  table-striped align-middle mb-0" style="min-width: 600px;">
+                                            <thead class="table text-center">
                                                 <tr>
                                                     <th class="ps-4">Monto</th>
                                                     <th>Descripción</th>
@@ -230,7 +277,7 @@
                                                     <th>Hora</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="gastos-list" class="border-top-0">
+                                            <tbody id="gastos-list" class="border-top-0 text-center">
                                                 <tr>
                                                     <td colspan="5" class="text-center py-5 text-muted">Cargando
                                                         datos...</td>
@@ -239,7 +286,7 @@
                                         </table>
                                     </div>
                                 </div>
-                                <div class="card-footer bg-white border-0 pb-3 pt-4">
+                                <div class="card-footer border-0 pb-3 pt-4">
                                     <nav aria-label="Navegación">
                                         <ul class="pagination justify-content-center mb-0 flex-wrap"
                                             id="pagination-controls"></ul>
@@ -254,6 +301,7 @@
         </div>
 
     </div>
+
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
