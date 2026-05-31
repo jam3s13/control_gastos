@@ -167,6 +167,23 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 // ==========================================
 
 export async function abrirPerfil() {
+
+    // === 1. MATAR EL FOCO (LA SOLUCIÓN AL ERROR ROJO) ===
+    // Esto obliga al navegador a soltar el botón "btn-close" de la X
+    if (document.activeElement) {
+        document.activeElement.blur(); 
+    }
+
+    // === 2. CERRAR EL MENÚ Y ESPERAR ===
+    const menuLateral = document.getElementById('sidebarMenu');
+    if (menuLateral && typeof bootstrap !== 'undefined') {
+        const bsOffcanvas = bootstrap.Offcanvas.getInstance(menuLateral);
+        if (bsOffcanvas) bsOffcanvas.hide();
+        
+        // Esperamos medio segundo exacto para que Bootstrap limpie su basura
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     // 1. Obtener datos del usuario
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return;
@@ -296,6 +313,21 @@ export async function abrirPerfil() {
 // LÓGICA PARA CAMBIAR CONTRASEÑA (Con ojito para ver)
 // ==========================================
 async function abrirCambioContrasena() {
+
+    // === 1. MATAR EL FOCO ===
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+
+    // === 2. CERRAR EL MENÚ Y ESPERAR ===
+    const menuLateral = document.getElementById('sidebarMenu');
+    if (menuLateral && typeof bootstrap !== 'undefined') {
+        const bsOffcanvas = bootstrap.Offcanvas.getInstance(menuLateral);
+        if (bsOffcanvas) bsOffcanvas.hide();
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    // ===================================
+
     const { value: nuevaContrasena } = await Swal.fire({
         title: '<i class="bi bi-shield-lock text-warning"></i> Cambiar Contraseña',
         html: `
