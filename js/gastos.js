@@ -215,7 +215,7 @@ window.abrirModalNuevoGasto = async () => {
   const fechaLocal = hoy.toISOString().split("T")[0];
 
   const { value: formValues } = await Swal.fire({
-    title: "➕ Registrar Nuevo Gasto",
+    title: '<i class="bi bi-plus-circle text-success"></i> <label class="text-success">Registrar nuevo gasto</label>',
     html: `
             <div class="container text-start p-2">
                 <div class="row g-3">
@@ -344,7 +344,7 @@ window.abrirModalEditar = async (id) => {
   if (!g) return;
 
   const { value: formValues } = await Swal.fire({
-    title: "✏️ Editar Registro de Gasto",
+    title: `<i class="bi bi-pencil-square text-dark"></i> <label class="text-dark"> Editar gasto</label>`,
     html: `
             <div class="container text-start p-2">
                 <div class="row g-3">

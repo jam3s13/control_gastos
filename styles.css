@@ -8,9 +8,30 @@ body {
 }
 
 /* ==========================================
-   2. PANTALLA DE LOGIN
+   2. PANTALLA DE LOGIN (INDEPENDIENTE)
 ========================================== */
+/* Todo lo que comience con #auth-container SOLO afecta al login */
 
+#auth-container .card {
+    background-color: #212529 !important; /* bg-dark puro */
+}
+
+#auth-container .form-control {
+    background-color: #6c757d !important; /* bg-secondary para el login */
+    color: #ffffff !important;
+}
+
+#auth-container .form-control:focus {
+    background-color: #5c636a !important; /* Un poco más oscuro al enfocar */
+    color: #ffffff !important;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important; /* Glow verde éxito */
+    border: 1px solid #198754 !important;
+}
+
+#auth-container .form-floating > .form-control:focus ~ label,
+#auth-container .form-floating > .form-control:not(:placeholder-shown) ~ label {
+    color: #198754 !important; /* Texto verde al enfocar el label */
+}
 
 /* ==========================================
    3. ELEMENTOS GLOBALES
@@ -30,14 +51,11 @@ body {
 .main-content {
     background-color: var(--bs-body-bg);
     min-height: 100vh;
-    /* Permite que el contenido fluya hacia abajo naturalmente */
 }
 
 /* ==========================================
    5. BARRA LATERAL (SOLO PC / ESCRITORIO)
 ========================================== */
-/* En celulares, Bootstrap ya maneja el menú con la clase "offcanvas", 
-   así que solo aplicamos esto para pantallas grandes */
 @media (min-width: 992px) {
     .sidebar {
         width: 300px !important;
@@ -64,29 +82,9 @@ body {
         opacity: 0;
         transform: translateY(15px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
 
-/* Estilo para los inputs en modo oscuro */
-.form-control {
-    background-color: rgb(212, 212, 212) !important;
-    color: #000000 !important;
-}
-
-.form-control:focus {
-    background-color: #a8a8a8 !important;
-    color: rgb(88, 88, 88)!important;
-    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important;
-    /* Glow verde éxito */
-    border: 1px solid #198754 !important;
-}
-
-/* Ajuste para el label de los floating inputs */
-.form-floating>.form-control:focus~label,
-.form-floating>.form-control:not(:placeholder-shown)~label {
-    color: #198754 !important;
-}

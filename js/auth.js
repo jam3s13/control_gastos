@@ -220,7 +220,7 @@ export async function abrirPerfil() {
         title: '<i class="bi bi-person-circle text-primary"></i> Mi Perfil',
        html: `
             <div class="text-center mb-3">
-                <img id="swalAvatarPreview" src="${avatarActual}" class="rounded-circle shadow border border-3 border-light" width="100" height="100" style="background-color: #f8f9fa;">
+                <img id="swalAvatarPreview" src="${avatarActual}" class="rounded-circle shadow border border-3 border-light" width="100" height="100">
             </div>
             
             <div class="mb-4">
